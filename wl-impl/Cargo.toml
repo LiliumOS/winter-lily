@@ -1,0 +1,18 @@
+[package]
+name = "wl-impl"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+indexmap = "2.7.1"
+lilium-sys.workspace = true
+bytemuck.workspace = true
+libc = "0.2.169"
+memchr = "2.7.4"
+linux-syscall.workspace = true
+
+[lib]
+crate-type = ["dylib"]
+
+[build-dependencies]
+cc = "1.2.11"

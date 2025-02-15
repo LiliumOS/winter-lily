@@ -1,0 +1,66 @@
+#![feature(iter_next_chunk)]
+use std::env::VarError;
+
+fn main() {
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("cargo should set this");
+    let env = std::env::var("WL_LILIUM_TARGET");
+    let lilium_target = match &env {
+        Ok(st) => {
+            let mut v = st.split("-");
+
+            let [arch, second, third, fourth] = v.next_chunk().map_or_else(
+                |mut v| [v.next(), v.next(), v.next(), v.next()],
+                |v| v.map(Some),
+            );
+
+            let arch = arch.expect("There must be an architecture");
+            let second = second.expect("There must be at least 2 components");
+
+            let vendor = if third.is_some() && fourth.is_some() {
+                second
+            } else if third.is_some() && second != "lilium" {
+                second
+            } else {
+                "pc"
+            };
+
+            let os = if let Some(third) = third {
+                if fourth.is_some() {
+                    third
+                } else if second != "lilium" {
+                    second
+                } else {
+                    third
+                }
+            } else {
+                second
+            };
+
+            let env = if let Some(fourth) = fourth {
+                fourth
+            } else if let Some(third) = third {
+                if second == "lilium" { third } else { "std" }
+            } else {
+                "std"
+            };
+
+            (arch, vendor, os, env)
+        }
+        Err(VarError::NotUnicode(os)) => panic!("WL_LILIUM_TARGET set to non-UTF-8 text ({os:?})"),
+        Err(VarError::NotPresent) => {
+            println!("cargo::rustc-env=WL_LILIUM_TARGET=\"{arch}-pc-lilium-std\"");
+            (&*arch, "pc", "lilium", "std")
+        }
+    };
+
+    let file = format!("c/signal_support/{}.c", arch);
+
+    println!("cargo::rerun-if-changed={file}");
+
+    cc::Build::new()
+        .file(file)
+        .std("c17")
+        .pic(true)
+        .cargo_metadata(true)
+        .compile("signal_support");
+}

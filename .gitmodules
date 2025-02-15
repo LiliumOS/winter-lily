@@ -1,0 +1,3 @@
+[submodule "wl-ld-lilium/ld-so-impl"]
+	path = wl-ld-lilium/ld-so-impl
+	url = https://github.com/LiliumOS/ld-so-impl.git

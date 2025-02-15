@@ -1,0 +1,23 @@
+[package]
+name = "wl-ld-lilium"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+wl-impl.workspace = true
+linux-syscall.workspace = true
+goblin = { version = "0.9.3", default-features = false, features = [
+    "elf64",
+    "elf32",
+    "endian_fd",
+] }
+libc = "0.2.169"
+bytemuck.workspace = true
+lilium-sys.workspace = true
+rand = { version = "0.9.0", default-features = false }
+fake-enum = "0.1.4"
+ld-so-impl = { path = "ld-so-impl" }
+linux-errno = "1.0.1"
+
+[lib]
+crate-type = ["cdylib"]
