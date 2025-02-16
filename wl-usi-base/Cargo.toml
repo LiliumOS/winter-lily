@@ -5,6 +5,7 @@ version.workspace = true
 
 [dependencies]
 lilium-sys.workspace = true
+uuid = "1.13.1"
 wl-impl.workspace = true
 
 [lib]

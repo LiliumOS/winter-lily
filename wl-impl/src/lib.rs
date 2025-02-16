@@ -2,7 +2,12 @@
     thread_local,
     string_from_utf8_lossy_owned,
     naked_functions,
-    never_type
+    never_type,
+    nonzero_ops,
+    exact_size_is_empty,
+    iter_next_chunk,
+    array_into_iter_constructors,
+    iter_advance_by
 )]
 use core::sync::atomic::AtomicI8;
 
@@ -58,3 +63,14 @@ pub unsafe fn setup_process(wl_load_base: *mut u8, wl_load_size: usize, mode: Fi
 }
 
 pub const LILIUM_TARGET: &str = core::env!("WL_LILIUM_TARGET");
+
+pub mod consts {
+    pub const ARCH: &str = core::env!("WL_LILIUM_TARGET_ARCH");
+    pub const OS_NAME: &str = core::env!("WL_LILIUM_TARGET_OS");
+    pub const ENV: &str = core::env!("WL_LILIUM_TARGET_ENV");
+
+    pub const VERSION: &str =
+        git_version::git_version!(prefix = ::core::concat!(::core::env!("CARGO_PKG_VERSION"), "-"));
+
+    pub const KVENDOR_NAME: &str = core::env!("WL_VENDOR_NAME");
+}

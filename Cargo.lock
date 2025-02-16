@@ -30,9 +30,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.13"
+version = "1.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7777341816418c02e033934a09f20dc0ccaf65a5201ef8a450ae0105a573fda"
+checksum = "0c3d1b2e905a3a7b00a6141adb0e4c0bb941d11caf55349d863942a1cc44e3c9"
 dependencies = [
  "shlex",
 ]
@@ -45,15 +45,35 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "equivalent"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
+checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 
 [[package]]
 name = "fake-enum"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "185b4cd26aff3789b8662aa73732b585d46b9756cd3c6b302be72f68302c5eba"
+
+[[package]]
+name = "git-version"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ad568aa3db0fcbc81f2f116137f263d7304f512a1209b35b85150d3ef88ad19"
+dependencies = [
+ "git-version-macro",
+]
+
+[[package]]
+name = "git-version-macro"
+version = "0.3.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53010ccb100b96a67bc32c0175f0ed1426b31b655d562898e57325f81c023ac0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
+]
 
 [[package]]
 name = "goblin"
@@ -99,12 +119,13 @@ checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 [[package]]
 name = "lilium-sys"
 version = "0.1.0"
-source = "git+https://github.com/LiliumOS/lilium-sys.git#cdb52fbaf45932ba671cbda7de66e9a687dea33f"
+source = "git+https://github.com/LiliumOS/lilium-sys.git#b3f767f2f0c336a2988d6e099590a058c97afb86"
 dependencies = [
  "bitflags",
  "bytemuck",
  "cfg-if",
  "paste",
+ "uuid",
  "with_builtin_macros",
 ]
 
@@ -186,9 +207,9 @@ dependencies = [
 
 [[package]]
 name = "rand_core"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b08f3c9802962f7e1b25113931d94f43ed9725bebc59db9d0c3e9a23b67e15ff"
+checksum = "a88e0da7a2c97baa202165137c158d0a2e824ac465d13d81046727b34cb247d3"
 dependencies = [
  "zerocopy",
 ]
@@ -248,6 +269,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a210d160f08b701c8721ba1c726c11662f877ea6b7094007e1ca9a1041945034"
 
 [[package]]
+name = "uuid"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ced87ca4be083373936a67f8de945faa23b6b42384bd5b64434850802c6dccd0"
+
+[[package]]
 name = "with_builtin_macros"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -273,6 +300,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "cc",
+ "git-version",
  "indexmap",
  "libc",
  "lilium-sys",
@@ -301,23 +329,24 @@ name = "wl-usi-base"
 version = "0.1.0"
 dependencies = [
  "lilium-sys",
+ "uuid",
  "wl-impl",
 ]
 
 [[package]]
 name = "zerocopy"
-version = "0.8.17"
+version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa91407dacce3a68c56de03abe2760159582b846c6a4acd2f456618087f12713"
+checksum = "79386d31a42a4996e3336b0919ddb90f81112af416270cff95b5f5af22b839c2"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.17"
+version = "0.8.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06718a168365cad3d5ff0bb133aad346959a2074bd4a85c121255a11304a8626"
+checksum = "76331675d372f91bf8d17e13afbd5fe639200b73d01f0fc748bb059f9cca2db7"
 dependencies = [
  "proc-macro2",
  "quote",

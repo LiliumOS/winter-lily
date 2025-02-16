@@ -53,6 +53,29 @@ fn main() {
         }
     };
 
+    println!(
+        "cargo::rustc-env=WL_LILIUM_TARGET_ARCH=\"{}\"",
+        lilium_target.0
+    );
+    println!(
+        "cargo::rustc-env=WL_LILIUM_TARGET_VENDOR=\"{}\"",
+        lilium_target.1
+    );
+    println!(
+        "cargo::rustc-env=WL_LILIUM_TARGET_OS=\"{}\"",
+        lilium_target.2
+    );
+    println!(
+        "cargo::rustc-env=WL_LILIUM_TARGET_ENV=\"{}\"",
+        lilium_target.3
+    );
+
+    match std::env::var("WL_VENDOR_NAME") {
+        Ok(_) => {}
+        Err(VarError::NotUnicode(os)) => panic!("WL_VENDOR_NAME set to non-UTF-8 text ({os:?})"),
+        Err(VarError::NotPresent) => println!("cargo::rustc-env=WL_VENDOR_NAME=\"winter-lily\""),
+    }
+
     let file = format!("c/signal_support/{}.c", arch);
 
     println!("cargo::rerun-if-changed={file}");
