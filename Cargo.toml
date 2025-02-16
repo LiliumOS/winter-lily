@@ -17,6 +17,7 @@ lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-featu
 bytemuck = { version = "1.21.0", features = ["latest_stable_rust"] }
 wl-impl = { path = "wl-impl", version = "0.1.0" }
 linux-syscall = "1.0.0"
+cfg-match = "0.2.1"
 
 # [profile.dev]
 # panic = "abort"

@@ -65,12 +65,20 @@ pub unsafe fn setup_process(wl_load_base: *mut u8, wl_load_size: usize, mode: Fi
 pub const LILIUM_TARGET: &str = core::env!("WL_LILIUM_TARGET");
 
 pub mod consts {
+    use crate::helpers::const_parse_u32;
+
     pub const ARCH: &str = core::env!("WL_LILIUM_TARGET_ARCH");
     pub const OS_NAME: &str = core::env!("WL_LILIUM_TARGET_OS");
     pub const ENV: &str = core::env!("WL_LILIUM_TARGET_ENV");
 
-    pub const VERSION: &str =
-        git_version::git_version!(prefix = ::core::concat!(::core::env!("CARGO_PKG_VERSION"), "-"));
+    pub const VERSION: &str = git_version::git_version!(
+        prefix = ::core::concat!(::core::env!("CARGO_PKG_VERSION"), "-"),
+        cargo_suffix = "-packaged"
+    );
 
     pub const KVENDOR_NAME: &str = core::env!("WL_VENDOR_NAME");
+
+    pub const VERSION_MAJOR: u32 = const_parse_u32(core::env!("CARGO_PKG_VERSION_MAJOR"), 10);
+    pub const VERSION_MINOR: u32 = const_parse_u32(core::env!("CARGO_PKG_VERSION_MINOR"), 10);
+    pub const VERSION_PATCH: u32 = const_parse_u32(core::env!("CARGO_PKG_VERSION_PATCH"), 10);
 }

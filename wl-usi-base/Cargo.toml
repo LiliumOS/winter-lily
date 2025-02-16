@@ -5,8 +5,9 @@ version.workspace = true
 
 [dependencies]
 lilium-sys.workspace = true
-uuid = "1.13.1"
+uuid = { version = "1.13.1", features = ["v5"] }
 wl-impl.workspace = true
+cfg-match.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

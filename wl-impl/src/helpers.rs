@@ -9,7 +9,7 @@ use libc::{sigaction, sigset_t};
 use lilium_sys::{
     result::{Error as SysError, Result as SysResult},
     sys::{
-        kstr::{KCSlice, KSlice, KStrCPtr},
+        kstr::{KCSlice, KSlice, KStrCPtr, KStrPtr},
         option::ExtendedOptionHead,
     },
 };
@@ -568,4 +568,57 @@ pub unsafe fn iter_checked<'a, T>(slice: KCSlice<T>) -> CheckedSliceIter<'a, T> 
 
 pub unsafe fn iter_mut_checked<'a, T>(slice: KSlice<T>) -> CheckedSliceIterMut<'a, T> {
     unsafe { CheckedSliceIterMut::from_kslice_unchecked(slice) }
+}
+
+pub unsafe fn fill_str(kstr: &mut KStrPtr, st: &str) -> SysResult<()> {
+    let len = kstr.len.min(st.len());
+
+    unsafe {
+        copy_nonoverlapping_checked(st.as_ptr(), kstr.str_ptr, len)?;
+    }
+
+    if core::mem::replace(&mut kstr.len, len) < st.len() {
+        Err(SysError::InsufficientLength)
+    } else {
+        Ok(())
+    }
+}
+
+pub const fn const_parse_u32(v: &str, radix: u32) -> u32 {
+    if radix < 2 || radix > 36 {
+        panic!("Invalid radix")
+    }
+
+    let mut val = 0u32;
+
+    let b = v.as_bytes();
+
+    let mut i = 0;
+
+    while i < b.len() {
+        let b = b[i];
+
+        let d = match b {
+            b'0'..=b'9' => b - b'0',
+            b'A'..=b'Z' => (b - b'A') + 10,
+            b'a'..=b'z' => (b - b'a') + 10,
+            _ => panic!("Expected a digit"),
+        } as u32;
+
+        if d < radix {
+            let v = match val.checked_mul(radix) {
+                Some(v) => v.checked_add(d),
+                None => None,
+            };
+
+            match v {
+                Some(v) => val = v,
+                None => panic!("Out of Range value"),
+            }
+        } else {
+            panic!("Out of Range digit")
+        }
+        i += 1;
+    }
+    val
 }
