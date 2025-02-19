@@ -10,12 +10,14 @@ use core::{
 use core::ptr::NonNull;
 use std::{
     alloc::{AllocError, Allocator},
+    ffi::CStr,
     iter::zip,
     mem::ManuallyDrop,
     ops::{ControlFlow, FromResidual, Residual, Try},
 };
 
 use bytemuck::{NoUninit, Zeroable};
+use libc::{DIR, c_char};
 use lilium_sys::misc::MaybeValid;
 
 #[repr(transparent)]
@@ -110,7 +112,7 @@ impl<'a, T, R: ZeroPrimitive> NullTerm<'a, T, R> {
 impl<'a> NullTerm<'a, u8, u8> {
     #[inline(always)]
     pub const fn as_utf8(&self) -> Result<&'a str, Utf8Error> {
-        core::str::from_utf8(self.as_slice())
+        Ok(unsafe { core::str::from_utf8_unchecked(self.as_slice()) })
     }
 }
 
@@ -336,6 +338,17 @@ impl<T> OnceLock<T> {
         self.try_get_or_init(move || Success(f())).0
     }
 
+    pub fn get_or_try_init<E>(&self, f: impl FnOnce() -> Result<T, E>) -> Result<&T, E> {
+        self.try_get_or_init(f)
+    }
+
+    pub fn get_or_try_init_mut<E>(
+        &mut self,
+        f: impl FnOnce() -> Result<T, E>,
+    ) -> Result<&mut T, E> {
+        self.try_get_or_init_mut(f)
+    }
+
     pub fn set(&self, val: T) -> Result<(), T> {
         let mut val = Some(val);
 
@@ -357,7 +370,9 @@ impl<T> OnceLock<T> {
 }
 
 pub use ld_so_impl::helpers::*;
-use linux_syscall::{SYS_mmap, SYS_mremap, SYS_munmap, syscall};
+use linux_syscall::{
+    SYS_close, SYS_getdents64, SYS_mmap, SYS_mremap, SYS_munmap, SYS_openat, SYS_write, syscall,
+};
 
 pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut [T] {
     if dest.len() < src.len() {
@@ -372,6 +387,8 @@ pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut 
 
 use core::ffi::c_void;
 use linux_syscall::Result as _;
+
+use crate::io::linux_err_into_io_err;
 
 #[derive(Copy, Clone, Debug)]
 pub struct MmapAllocator {
@@ -522,4 +539,273 @@ unsafe impl Allocator for MmapAllocator {
 
         NonNull::new(core::ptr::slice_from_raw_parts_mut(ptr, new_size)).ok_or(AllocError)
     }
+}
+
+#[inline(always)]
+pub fn safe_zeroed<T: Zeroable>() -> T {
+    let mut val = MaybeUninit::<T>::uninit();
+
+    let p = val.as_mut_ptr().cast::<u8>();
+
+    for i in 0..core::mem::size_of::<T>() {
+        unsafe { p.add(i).write(0) }
+    }
+
+    unsafe { val.assume_init() }
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn memcmp(a: *const i8, b: *mut i8, len: usize) -> i32 {
+    for i in 0..len {
+        match (unsafe { a.add(i).read() }) - (unsafe { b.add(i).read() }) {
+            0 => continue,
+            -128..=-1 => return -1,
+            1..=127 => return 1,
+        }
+    }
+
+    0
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn memset(ptr: *mut u8, b: i32, len: usize) -> *mut u8 {
+    for i in 0..len {
+        unsafe { ptr.add(i).write(b as u8) }
+    }
+    ptr
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, len: usize) -> *mut u8 {
+    for i in 0..len {
+        unsafe { dest.add(i).write(src.add(i).read()) }
+    }
+    dest
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, len: usize) -> *mut u8 {
+    for i in 0..len {
+        unsafe { dest.add(i).write(src.add(i).read()) }
+    }
+    dest
+}
+
+ld_so_impl::hidden_syms!(memcmp, memset, memmove, memcpy);
+
+pub struct SplitAscii<'a>(&'a [u8], u8);
+
+impl<'a> SplitAscii<'a> {
+    pub const fn new(v: &'a str, val: u8) -> Self {
+        if val > 0x80 {
+            panic!()
+        }
+        Self(v.as_bytes(), val)
+    }
+
+    pub const fn as_str(&self) -> &'a str {
+        unsafe { core::str::from_utf8_unchecked(self.0) }
+    }
+
+    #[inline]
+    pub fn split_once(mut self) -> (&'a str, &'a str) {
+        let val = self.next().unwrap_or("");
+
+        (val, self.as_str())
+    }
+
+    #[inline]
+    pub fn rsplit_once(mut self) -> (&'a str, &'a str) {
+        let rval = self.next_back().unwrap_or("");
+
+        (self.as_str(), rval)
+    }
+
+    pub fn find(&self) -> Option<usize> {
+        for (i, b) in self.0.iter().enumerate() {
+            if *b == self.1 {
+                return Some(i);
+            }
+        }
+        None
+    }
+}
+
+impl<'a> Iterator for SplitAscii<'a> {
+    type Item = &'a str;
+
+    #[inline]
+    fn next(&mut self) -> Option<&'a str> {
+        if self.0.is_empty() {
+            return None;
+        } else {
+            for (i, b) in self.0.iter().enumerate() {
+                if *b == self.1 {
+                    let v = unsafe { core::str::from_utf8_unchecked(&self.0[..i]) };
+
+                    self.0 = &self.0[(i + 1)..];
+
+                    return Some(v);
+                }
+            }
+
+            let v = unsafe { core::str::from_utf8_unchecked(self.0) };
+            self.0 = &self.0[self.0.len()..];
+
+            Some(v)
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for SplitAscii<'a> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.0.is_empty() {
+            return None;
+        } else {
+            for (i, b) in self.0.iter().enumerate().rev() {
+                if *b == self.1 {
+                    let v = unsafe { core::str::from_utf8_unchecked(&self.0[(i + 1)..]) };
+
+                    self.0 = &self.0[..i];
+
+                    return Some(v);
+                }
+            }
+
+            let v = unsafe { core::str::from_utf8_unchecked(self.0) };
+            self.0 = &self.0[..1];
+
+            Some(v)
+        }
+    }
+}
+
+const DEBUG_PROMPT: &str = "[debug] ";
+#[inline]
+pub fn debug(src: &str, buf: &[u8]) {
+    unsafe {
+        let _ = syscall!(
+            SYS_write,
+            libc::STDERR_FILENO,
+            DEBUG_PROMPT.as_ptr(),
+            DEBUG_PROMPT.len()
+        );
+    }
+    unsafe {
+        let _ = syscall!(SYS_write, libc::STDERR_FILENO, src.as_ptr(), src.len());
+    }
+    unsafe {
+        let _ = syscall!(SYS_write, libc::STDERR_FILENO, b": ".as_ptr(), 2);
+    }
+    unsafe {
+        let _ = syscall!(SYS_write, libc::STDERR_FILENO, buf.as_ptr(), buf.len());
+    }
+    unsafe {
+        let _ = syscall!(SYS_write, libc::STDERR_FILENO, &b'\n' as *const u8, 1);
+    }
+}
+
+pub fn open_rdonly(at_fd: i32, st: &str) -> std::io::Result<i32> {
+    debug("open_rdonly", st.as_bytes());
+    let mut path = safe_zeroed::<[u8; 256]>();
+    copy_to_slice_head(&mut path, st.as_bytes())[0] = 0;
+    let fd = unsafe { syscall!(SYS_openat, at_fd, path.as_ptr(), libc::O_RDONLY) };
+    fd.check().map_err(linux_err_into_io_err)?;
+
+    Ok(fd.as_u64_unchecked() as i32)
+}
+
+#[repr(C)]
+struct Dirent64 {
+    d_ino: libc::ino64_t,
+    d_off: libc::off64_t,
+    d_reclen: u16,
+    d_type: u8,
+    d_name: [c_char; 0],
+}
+
+pub fn has_prefix(long: &[u8], prefix: &[u8]) -> bool {
+    if long.len() < prefix.len() {
+        false
+    } else {
+        &long[..prefix.len()] == prefix
+    }
+}
+
+pub fn has_suffix(long: &[u8], suffix: &[u8]) -> bool {
+    if long.len() < suffix.len() {
+        false
+    } else {
+        let n = long.len() - suffix.len();
+        &long[n..] == suffix
+    }
+}
+
+pub fn expand_glob(
+    path: &str,
+    mut f: impl FnMut(i32, &CStr) -> std::io::Result<()>,
+) -> std::io::Result<()> {
+    let (prefix, suffix) = SplitAscii::new(path, b'*').split_once();
+
+    let (dir, prefix) = SplitAscii::new(prefix, b'/').rsplit_once();
+
+    debug("expand_glob(prefix)", prefix.as_bytes());
+    debug("expand_glob(suffix)", suffix.as_bytes());
+
+    let fd = open_rdonly(libc::AT_FDCWD, dir)?;
+
+    let mut buf = unsafe {
+        Box::<MaybeUninit<[u8; 4096]>, _>::assume_init(Box::<[u8; 4096], _>::new_zeroed_in(
+            MmapAllocator::new_with_hint(
+                crate::ldso::__MMAP_ADDR
+                    .get_shared()
+                    .0
+                    .wrapping_add(4096 * 4),
+            ),
+        ))
+    };
+
+    let res = (|| -> std::io::Result<()> {
+        loop {
+            let len = unsafe { syscall!(SYS_getdents64, fd, buf.as_mut_ptr(), 4096) };
+
+            len.check().map_err(linux_err_into_io_err)?;
+
+            let len = len.as_usize_unchecked();
+            if len == 0 {
+                break Ok(());
+            }
+            let mut buf = buf.as_ptr();
+
+            let mut n = 0;
+
+            while n < len {
+                let ent = buf.cast::<Dirent64>();
+
+                let rlen = unsafe { (*ent).d_reclen } as usize;
+
+                n += rlen;
+                buf = unsafe { buf.add(rlen) };
+
+                let name = unsafe { core::ptr::addr_of!((*ent).d_name).cast::<i8>() };
+
+                let name = unsafe { cstr_from_ptr(name) };
+
+                debug("expand_glob", name.to_bytes());
+
+                let name_bytes = name.to_bytes();
+
+                if has_prefix(name_bytes, prefix.as_bytes())
+                    && has_suffix(name_bytes, suffix.as_bytes())
+                {
+                    f(fd, name)?;
+                }
+            }
+        }
+    })();
+
+    let _ = unsafe { syscall!(SYS_close, fd) };
+
+    res
 }

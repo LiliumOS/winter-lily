@@ -19,18 +19,20 @@ wl-impl = { path = "wl-impl", version = "0.1.0" }
 linux-syscall = "1.0.0"
 cfg-match = "0.2.1"
 
-# [profile.dev]
-# panic = "abort"
+[profile.dev]
+panic = "abort"
 
 [profile.dev.package.ld-so-impl]
 opt-level = 3
 overflow-checks = false
 debug-assertions = false
+debug = true
 
 [profile.dev.package.wl-ld-lilium]
 opt-level = 3
 overflow-checks = false
 debug-assertions = false
+debug = true
 
-# [profile.release]
-# panic = "abort"
+[profile.release]
+panic = "abort"

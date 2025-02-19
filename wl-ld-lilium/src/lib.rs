@@ -1,11 +1,13 @@
 #![no_main]
+#![no_builtins]
 #![feature(
     slice_from_ptr_range,
     const_slice_from_ptr_range,
     try_trait_v2,
     try_trait_v2_residual,
     allocator_api,
-    alloc_layout_extra
+    alloc_layout_extra,
+    naked_functions
 )]
 
 mod auxv;

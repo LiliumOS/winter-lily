@@ -1,7 +1,7 @@
 use std::{io::BufRead, str::Utf8Error};
 
 use linux_errno::Error as SysError;
-use linux_syscall::{Result as _, SYS_read, syscall};
+use linux_syscall::{Result as _, SYS_lseek, SYS_read, syscall};
 
 use crate::helpers::copy_to_slice_head;
 
@@ -36,7 +36,7 @@ impl BufFdReader {
     pub fn read_line_static<'a>(
         &mut self,
         n: &'a mut [u8],
-    ) -> std::io::Result<Option<Result<&'a mut str, (&'a mut [u8], Utf8Error)>>> {
+    ) -> std::io::Result<Option<&'a mut str>> {
         let mut pos = 0;
         loop {
             let (_, tail) = n.split_at_mut(pos);
@@ -54,7 +54,7 @@ impl BufFdReader {
             let real_len = max_len.min(tail.len());
 
             copy_to_slice_head(tail, &buf[..real_len]);
-            self.consume(real_len);
+            self.consume(real_len + (found as usize));
             pos += real_len;
 
             if tail.len() < max_len || found {
@@ -64,10 +64,25 @@ impl BufFdReader {
 
         let slice = &mut n[..pos];
 
-        match core::str::from_utf8_mut(slice) {
-            Ok(v) => Ok(Some(Ok(unsafe { &mut *(&raw mut *v) }))),
-            Err(e) => Ok(Some(Err((slice, e)))),
-        }
+        Ok(Some(unsafe { core::str::from_utf8_unchecked_mut(slice) }))
+    }
+}
+
+impl std::io::Seek for BufFdReader {
+    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.pos = self.len;
+
+        let (whence, pos) = match pos {
+            std::io::SeekFrom::Start(n) => (libc::SEEK_SET, n as libc::off_t),
+            std::io::SeekFrom::End(n) => (libc::SEEK_END, n as libc::off_t),
+            std::io::SeekFrom::Current(n) => (libc::SEEK_CUR, n as libc::off_t),
+        };
+
+        let res = unsafe { syscall!(SYS_lseek, self.fd, pos, whence) };
+
+        res.check().map_err(linux_err_into_io_err)?;
+
+        Ok(res.as_u64_unchecked())
     }
 }
 
