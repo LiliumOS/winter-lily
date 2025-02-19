@@ -7,7 +7,9 @@
     exact_size_is_empty,
     iter_next_chunk,
     array_into_iter_constructors,
-    iter_advance_by
+    iter_advance_by,
+    allocator_api,
+    alloc_layout_extra
 )]
 use core::sync::atomic::AtomicI8;
 
@@ -19,6 +21,8 @@ pub mod syscall_helpers;
 pub mod catch_signals;
 
 pub mod syscall_handler;
+
+pub mod alloc;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");

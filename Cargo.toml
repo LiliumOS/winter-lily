@@ -1,5 +1,11 @@
 [workspace]
-members = ["wl-impl", "wl-usi-base", "wl-ld-lilium", "wl-ld-lilium/ld-so-impl"]
+members = [
+    "wl-impl",
+    "wl-usi-base",
+    "wl-ld-lilium",
+    "wl-ld-lilium/ld-so-impl",
+    "wl-usi-io",
+]
 resolver = "3"
 
 [workspace.package]
@@ -18,6 +24,7 @@ bytemuck = { version = "1.21.0", features = ["latest_stable_rust"] }
 wl-impl = { path = "wl-impl", version = "0.1.0" }
 linux-syscall = "1.0.0"
 cfg-match = "0.2.1"
+libc = "0.2.169"
 
 [profile.dev]
 panic = "abort"

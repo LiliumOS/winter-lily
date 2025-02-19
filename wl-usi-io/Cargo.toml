@@ -1,0 +1,12 @@
+[package]
+name = "wl-usi-io"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+wl-impl.workspace = true
+libc.workspace = true
+lilium-sys.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
