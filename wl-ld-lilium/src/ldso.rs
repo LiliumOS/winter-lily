@@ -129,13 +129,13 @@ pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
     for p in SplitAscii::new(path, b'\x1E') {
         let vbuf = copy_to_slice_head(&mut buf, p.as_bytes());
         vbuf[0] = b'/';
-
-        if copy_to_slice_head(&mut vbuf[1..], name.to_bytes()).is_empty() {
+        let vbuf = copy_to_slice_head(&mut vbuf[1..], name.to_bytes());
+        if vbuf.is_empty() {
             panic!()
         }
+        vbuf[0] = 0;
 
         let bname = unsafe { cstr_from_ptr(buf.as_ptr().cast()) };
-        debug("open_module:search", bname.to_bytes());
 
         let fd = unsafe { syscall!(SYS_open, buf.as_ptr(), libc::O_RDONLY) };
 
@@ -166,8 +166,10 @@ pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
                 rd.seek(std::io::SeekFrom::Start(0))?;
                 core::mem::forget(rd);
 
-                crate::entry::x86_64::RESOLVER
-                    .resolve_error(unsafe { cstr_from_ptr(buf.as_ptr().cast()) }); // Debug print this
+                debug(
+                    "open_module(found)",
+                    unsafe { cstr_from_ptr(buf.as_ptr().cast()) }.to_bytes(),
+                );
                 return Ok(fd);
             }
             Err(e) => match e.get() as i32 {
