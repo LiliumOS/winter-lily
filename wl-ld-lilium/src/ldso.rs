@@ -1,11 +1,12 @@
-use std::ffi::{CStr, c_void};
-use std::io::{Read, Seek};
+use core::ffi::{CStr, c_void};
 
+use alloc::vec::Vec;
 use ld_so_impl::arch::crash_unrecoverably;
 use ld_so_impl::elf::consts::{ELFCLASS64, ELFMAG, ElfIdent};
 use ld_so_impl::elf::{EM_HOST, ElfClass, ElfHeader, ElfHost};
 use ld_so_impl::helpers::{cstr_from_ptr, strlen_impl};
 use ld_so_impl::hidden_syms;
+use linux_errno::{EACCES, ENOENT};
 use linux_syscall::{Result as _, SYS_close, SYS_open, SYS_write, syscall};
 
 use bytemuck::Zeroable;
@@ -17,7 +18,7 @@ use crate::helpers::{
     safe_zeroed,
 };
 
-use crate::io::{BufFdReader, linux_err_into_io_err};
+use crate::io::BufFdReader;
 
 pub static __MMAP_ADDR: FusedUnsafeCell<SyncPointer<*mut c_void>> =
     FusedUnsafeCell::new(SyncPointer::null_mut());
@@ -27,7 +28,7 @@ pub static __LDSO_LILIUM_SEARCH_LIST: OnceLock<&str> = OnceLock::new();
 
 use crate::helpers::{expand_glob, open_rdonly};
 
-fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> std::io::Result<()> {
+fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Result<()> {
     let mut v = safe_zeroed::<[u8; 256]>();
     let mut file = BufFdReader::new(fd);
 
@@ -44,7 +45,7 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> std::io::Resul
         }
 
         if let Some(path) = st.strip_prefix("include ") {
-            match open_rdonly(libc::AT_FDCWD, path) {
+            match open_rdonly(linux_raw_sys::general::AT_FDCWD, path) {
                 Ok(fd) => read_config_file(fd, buf)?,
                 Err(e) => {
                     if SplitAscii::new(path, b'*').find().is_some() {
@@ -68,13 +69,13 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> std::io::Resul
     }
 
     let res = unsafe { syscall!(SYS_close, fd) };
-    res.check().map_err(linux_err_into_io_err)
+    res.check()
 }
 
 use crate::helpers::SplitAscii;
 
 #[inline(never)]
-fn init_cache_slow(env_name: &str, config_path: &str) -> std::io::Result<&'static str> {
+fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'static str> {
     let mut buf = Vec::with_capacity_in(4096, MmapAllocator::new_with_hint(__MMAP_ADDR.0));
 
     for v in get_env(env_name)
@@ -85,7 +86,7 @@ fn init_cache_slow(env_name: &str, config_path: &str) -> std::io::Result<&'stati
         buf.resize(pos + v.len() + 1, 0x1E);
         copy_to_slice_head(&mut buf[pos..], v.as_bytes());
     }
-    if let Ok(fd) = open_rdonly(libc::AT_FDCWD, config_path) {
+    if let Ok(fd) = open_rdonly(linux_raw_sys::general::AT_FDCWD, config_path) {
         read_config_file(fd, &mut buf)?;
     }
 
@@ -101,7 +102,7 @@ pub enum SearchType {
     Winter = 1,
 }
 
-pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
+pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
     let mut buf = Vec::with_capacity_in(
         4096,
         MmapAllocator::new_with_hint(__MMAP_ADDR.0.wrapping_add(4096 * 8)),
@@ -137,7 +138,7 @@ pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
 
         let bname = unsafe { cstr_from_ptr(buf.as_ptr().cast()) };
 
-        let fd = unsafe { syscall!(SYS_open, buf.as_ptr(), libc::O_RDONLY) };
+        let fd = unsafe { syscall!(SYS_open, buf.as_ptr(), linux_raw_sys::general::O_RDONLY) };
 
         match fd.check() {
             Ok(()) => {
@@ -163,7 +164,7 @@ pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
                     continue;
                 }
 
-                rd.seek(std::io::SeekFrom::Start(0))?;
+                rd.seek(crate::io::SeekFrom::Start(0))?;
                 core::mem::forget(rd);
 
                 debug(
@@ -172,12 +173,12 @@ pub fn open_module(search: SearchType, name: &CStr) -> std::io::Result<i32> {
                 );
                 return Ok(fd);
             }
-            Err(e) => match e.get() as i32 {
-                libc::ENOENT | libc::EACCES => continue,
-                v => return Err(std::io::Error::from_raw_os_error(v)),
+            Err(e) => match e {
+                ENOENT | EACCES => continue,
+                v => return Err(v),
             },
         }
     }
 
-    Err(std::io::Error::from_raw_os_error(libc::ENOENT))
+    Err(ENOENT)
 }

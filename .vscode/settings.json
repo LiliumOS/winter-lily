@@ -1,5 +1,10 @@
 {
     "rust-analyzer.check.targets": [
         "x86_64-unknown-linux-gnu"
+    ],
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml",
+        "wl-ld-lilium/Cargo.toml",
+        "wl-ld-lilium/ld-so-impl/Cargo.toml"
     ]
 }

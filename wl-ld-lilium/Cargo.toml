@@ -1,17 +1,33 @@
 [package]
 name = "wl-ld-lilium"
-edition.workspace = true
-version.workspace = true
+edition = "2024"
+version = "0.1.0"
 
 [dependencies]
-linux-syscall.workspace = true
-libc = "0.2.169"
-bytemuck.workspace = true
-lilium-sys.workspace = true
-rand = { version = "0.9.0", default-features = false }
+linux-syscall = "1.0.0"
+bytemuck = { version = "1.21.0", features = ["latest_stable_rust"] }
+lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-features = false, features = [
+    "bytemuck",
+] }
 fake-enum = "0.1.4"
 ld-so-impl = { path = "ld-so-impl" }
 linux-errno = "1.0.1"
+linux-raw-sys = { version = "0.8.0", default-features = false, features = [
+    "general",
+    "no_std",
+    "prctl",
+] }
 
 [lib]
 crate-type = ["cdylib"]
+
+[profile.dev]
+opt-level = 3
+debug = 2
+overflow-checks = false
+debug-assertions = false
+
+[profile.release]
+opt-level = 3
+overflow-checks = false
+debug-assertions = false

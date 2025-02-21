@@ -1,4 +1,4 @@
-use std::ffi::c_void;
+use core::ffi::c_void;
 
 #[cfg(target_pointer_width = "64")]
 #[repr(C)]

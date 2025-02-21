@@ -1,6 +1,5 @@
 #!/bin/sh
 
-CARGOFLAGS=
 
 TARGET_PATH=debug
 
@@ -11,11 +10,9 @@ fi
 
 if [ "$RELEASE" != "" ]
 then
-    CARGOFLAGS="--release"
     TARGET_PATH=release
 fi
+TARGET="$TARGET" ./build.sh
 
-cargo build --target="$TARGET" $(CARGOFLAGS)
-
-LD_LIBRARY_PATH_WL_HOST="$(pwd)/target/${TARGET}/${TARGET_PATH}:$(pwd)/target/${TARGET}/${TARGET_PATH}/deps:${LD_LIBRARY_PATH}" exec target/${TARGET}/${TARGET_PATH}/libwl_ld_lilium.so "$@"
+LD_LIBRARY_PATH_WL_HOST="$(pwd)/target/${TARGET}/${TARGET_PATH}:$(pwd)/target/${TARGET}/${TARGET_PATH}/deps:${LD_LIBRARY_PATH}" exec target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
 

@@ -1,8 +1,7 @@
-use core::ffi::{c_char, c_void};
-use std::ptr::NonNull;
+use core::ffi::{c_char, c_ulong, c_void};
+use core::ptr::NonNull;
 
 use ld_so_impl::resolver::Resolver;
-use libc::c_ulong;
 use linux_syscall::{SYS_exit, SYS_prctl, SYS_write, syscall};
 
 use crate::auxv::AuxEnt;
@@ -60,8 +59,8 @@ core::arch::global_asm! {
     rust_entry = sym __rust_entry,
     STACK_DISPLACEMENT = const STACK_DISPLACEMENT,
     STACK_SIZE = const STACK_SIZE,
-    MMAP_PROT = const const {libc::PROT_READ | libc::PROT_WRITE },
-    MMAP_FLAGS = const const { libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_GROWSDOWN | libc::MAP_STACK }
+    MMAP_PROT = const const {linux_raw_sys::general::PROT_READ | linux_raw_sys::general::PROT_WRITE },
+    MMAP_FLAGS = const const { linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_ANONYMOUS | linux_raw_sys::general::MAP_GROWSDOWN | linux_raw_sys::general::MAP_STACK }
 }
 
 pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 8;
@@ -85,16 +84,21 @@ fn resolve_error(c: &core::ffi::CStr) -> ! {
     unsafe {
         let _ = syscall!(
             SYS_write,
-            libc::STDERR_FILENO,
+            linux_raw_sys::general::STDERR_FILENO,
             RES_ERROR.as_ptr(),
             RES_ERROR.len()
         );
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, ptr, len);
+        let _ = syscall!(SYS_write, linux_raw_sys::general::STDERR_FILENO, ptr, len);
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, &0x0Au8 as *const u8, 1);
+        let _ = syscall!(
+            SYS_write,
+            linux_raw_sys::general::STDERR_FILENO,
+            &0x0Au8 as *const u8,
+            1
+        );
     }
     unsafe {
         let _ = syscall!(SYS_exit, 1);
@@ -115,8 +119,8 @@ unsafe extern "C" fn __rust_entry(
     unsafe {
         let _ = syscall!(
             SYS_prctl,
-            libc::PR_SET_VMA,
-            libc::PR_SET_VMA_ANON_NAME,
+            linux_raw_sys::prctl::PR_SET_VMA,
+            linux_raw_sys::prctl::PR_SET_VMA_ANON_NAME,
             stack_addr,
             STACK_SIZE - 4096,
             c"ldso-stack".as_ptr()
@@ -137,7 +141,7 @@ unsafe extern "C" fn __rust_entry(
 
     LOADER.native_base.store(
         native_region_base.cast_mut(),
-        std::sync::atomic::Ordering::Relaxed,
+        core::sync::atomic::Ordering::Relaxed,
     );
 
     let auxv =
@@ -151,14 +155,16 @@ unsafe extern "C" fn __rust_entry(
     unsafe { (&mut *RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
     for auxent in auxv {
-        match auxent.at_tag as c_ulong {
-            libc::AT_RANDOM => rand = unsafe { auxent.at_val.cast::<[u8; 16]>().read() },
-            libc::AT_SECURE => {
+        match auxent.at_tag as u32 {
+            linux_raw_sys::general::AT_RANDOM => {
+                rand = unsafe { auxent.at_val.cast::<[u8; 16]>().read() }
+            }
+            linux_raw_sys::general::AT_SECURE => {
                 if auxent.at_val.addr() != 0 {
                     unsafe {
                         let _ = syscall!(
                             SYS_write,
-                            libc::STDERR_FILENO,
+                            linux_raw_sys::general::STDERR_FILENO,
                             CANNOT_RUN_IN_SECURE.as_ptr(),
                             CANNOT_RUN_IN_SECURE.len()
                         );
@@ -169,7 +175,7 @@ unsafe extern "C" fn __rust_entry(
                     unsafe { core::arch::asm!("ud2", options(noreturn)) }
                 }
             }
-            libc::AT_EXECFD => {
+            linux_raw_sys::general::AT_EXECFD => {
                 execfd = auxent.at_val.addr() as i32;
             }
 
@@ -194,7 +200,5 @@ unsafe extern "C" fn __rust_entry(
         );
     }
 
-    println!("Hello World!");
-
-    42
+    0
 }

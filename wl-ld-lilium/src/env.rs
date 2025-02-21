@@ -1,4 +1,4 @@
-use std::{ffi::c_char, ptr::NonNull};
+use core::{ffi::c_char, ptr::NonNull};
 
 use crate::helpers::{FusedUnsafeCell, NullTerm, SplitAscii, SyncPointer};
 

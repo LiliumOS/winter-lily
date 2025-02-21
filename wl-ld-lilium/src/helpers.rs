@@ -1,4 +1,5 @@
 use core::{
+    alloc::{GlobalAlloc, Layout},
     cell::UnsafeCell,
     marker::PhantomData,
     mem::MaybeUninit,
@@ -8,16 +9,17 @@ use core::{
 };
 
 use core::ptr::NonNull;
-use std::{
+use core::{
     alloc::{AllocError, Allocator},
-    ffi::CStr,
+    ffi::{CStr, c_char},
     iter::zip,
     mem::ManuallyDrop,
     ops::{ControlFlow, FromResidual, Residual, Try},
 };
 
+use alloc::boxed::Box;
 use bytemuck::{NoUninit, Zeroable};
-use libc::{DIR, c_char};
+use ld_so_impl::arch::crash_unrecoverably;
 use lilium_sys::misc::MaybeValid;
 
 #[repr(transparent)]
@@ -388,7 +390,21 @@ pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut 
 use core::ffi::c_void;
 use linux_syscall::Result as _;
 
-use crate::io::linux_err_into_io_err;
+pub struct NoGlobalAlloc;
+
+unsafe impl GlobalAlloc for NoGlobalAlloc {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        debug("alloc", b"Use MmapAllocator instead of Global");
+        crash_unrecoverably()
+    }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        debug("alloc", b"Use MmapAllocator instead of Global");
+        crash_unrecoverably()
+    }
+}
+
+#[global_allocator]
+static GLOBAL_ALLOC: NoGlobalAlloc = NoGlobalAlloc;
 
 #[derive(Copy, Clone, Debug)]
 pub struct MmapAllocator {
@@ -406,14 +422,14 @@ impl MmapAllocator {
 unsafe impl Allocator for MmapAllocator {
     fn allocate(
         &self,
-        layout: std::alloc::Layout,
-    ) -> Result<NonNull<[u8]>, std::alloc::AllocError> {
+        layout: core::alloc::Layout,
+    ) -> Result<NonNull<[u8]>, core::alloc::AllocError> {
         self.allocate_zeroed(layout)
     }
     fn allocate_zeroed(
         &self,
-        layout: std::alloc::Layout,
-    ) -> Result<NonNull<[u8]>, std::alloc::AllocError> {
+        layout: core::alloc::Layout,
+    ) -> Result<NonNull<[u8]>, core::alloc::AllocError> {
         if layout.align() > 4096 {
             return Err(AllocError);
         }
@@ -429,8 +445,8 @@ unsafe impl Allocator for MmapAllocator {
                 SYS_mmap,
                 self.hint_base_addr,
                 size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+                linux_raw_sys::general::PROT_READ | linux_raw_sys::general::PROT_WRITE,
+                linux_raw_sys::general::MAP_ANONYMOUS | linux_raw_sys::general::MAP_PRIVATE,
                 -1i32,
                 0u64
             )
@@ -443,7 +459,7 @@ unsafe impl Allocator for MmapAllocator {
         NonNull::new(core::ptr::slice_from_raw_parts_mut(ptr, size)).ok_or(AllocError)
     }
 
-    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: std::alloc::Layout) {
+    unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: core::alloc::Layout) {
         let size = layout.size().next_multiple_of(4096);
         if size != 0 {
             let _ = unsafe { syscall!(SYS_munmap, ptr.as_ptr(), size) };
@@ -453,8 +469,8 @@ unsafe impl Allocator for MmapAllocator {
     unsafe fn grow(
         &self,
         ptr: NonNull<u8>,
-        old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
+        old_layout: core::alloc::Layout,
+        new_layout: core::alloc::Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
         unsafe { self.grow_zeroed(ptr, old_layout, new_layout) }
     }
@@ -462,8 +478,8 @@ unsafe impl Allocator for MmapAllocator {
     unsafe fn shrink(
         &self,
         ptr: NonNull<u8>,
-        old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
+        old_layout: core::alloc::Layout,
+        new_layout: core::alloc::Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
         if new_layout.align() > 4096 {
             return Err(AllocError);
@@ -490,7 +506,7 @@ unsafe impl Allocator for MmapAllocator {
                 ptr.as_ptr(),
                 old_size,
                 new_size,
-                libc::MREMAP_MAYMOVE
+                linux_raw_sys::general::MREMAP_MAYMOVE
             )
         };
 
@@ -504,8 +520,8 @@ unsafe impl Allocator for MmapAllocator {
     unsafe fn grow_zeroed(
         &self,
         ptr: NonNull<u8>,
-        old_layout: std::alloc::Layout,
-        new_layout: std::alloc::Layout,
+        old_layout: core::alloc::Layout,
+        new_layout: core::alloc::Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
         if new_layout.align() > 4096 {
             return Err(AllocError);
@@ -529,7 +545,7 @@ unsafe impl Allocator for MmapAllocator {
                 ptr.as_ptr(),
                 old_size,
                 new_size,
-                libc::MREMAP_MAYMOVE
+                linux_raw_sys::general::MREMAP_MAYMOVE
             )
         };
 
@@ -687,39 +703,66 @@ pub fn debug(src: &str, buf: &[u8]) {
     unsafe {
         let _ = syscall!(
             SYS_write,
-            libc::STDERR_FILENO,
+            linux_raw_sys::general::STDERR_FILENO,
             DEBUG_PROMPT.as_ptr(),
             DEBUG_PROMPT.len()
         );
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, src.as_ptr(), src.len());
+        let _ = syscall!(
+            SYS_write,
+            linux_raw_sys::general::STDERR_FILENO,
+            src.as_ptr(),
+            src.len()
+        );
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, b": ".as_ptr(), 2);
+        let _ = syscall!(
+            SYS_write,
+            linux_raw_sys::general::STDERR_FILENO,
+            b": ".as_ptr(),
+            2
+        );
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, buf.as_ptr(), buf.len());
+        let _ = syscall!(
+            SYS_write,
+            linux_raw_sys::general::STDERR_FILENO,
+            buf.as_ptr(),
+            buf.len()
+        );
     }
     unsafe {
-        let _ = syscall!(SYS_write, libc::STDERR_FILENO, &b'\n' as *const u8, 1);
+        let _ = syscall!(
+            SYS_write,
+            linux_raw_sys::general::STDERR_FILENO,
+            &b'\n' as *const u8,
+            1
+        );
     }
 }
 
-pub fn open_rdonly(at_fd: i32, st: &str) -> std::io::Result<i32> {
+pub fn open_rdonly(at_fd: i32, st: &str) -> crate::io::Result<i32> {
     debug("open_rdonly", st.as_bytes());
     let mut path = safe_zeroed::<[u8; 256]>();
     copy_to_slice_head(&mut path, st.as_bytes())[0] = 0;
-    let fd = unsafe { syscall!(SYS_openat, at_fd, path.as_ptr(), libc::O_RDONLY) };
-    fd.check().map_err(linux_err_into_io_err)?;
+    let fd = unsafe {
+        syscall!(
+            SYS_openat,
+            at_fd,
+            path.as_ptr(),
+            linux_raw_sys::general::O_RDONLY
+        )
+    };
+    fd.check()?;
 
     Ok(fd.as_u64_unchecked() as i32)
 }
 
 #[repr(C)]
 struct Dirent64 {
-    d_ino: libc::ino64_t,
-    d_off: libc::off64_t,
+    d_ino: i64,
+    d_off: i64,
     d_reclen: u16,
     d_type: u8,
     d_name: [c_char; 0],
@@ -744,8 +787,8 @@ pub fn has_suffix(long: &[u8], suffix: &[u8]) -> bool {
 
 pub fn expand_glob(
     path: &str,
-    mut f: impl FnMut(i32, &CStr) -> std::io::Result<()>,
-) -> std::io::Result<()> {
+    mut f: impl FnMut(i32, &CStr) -> crate::io::Result<()>,
+) -> crate::io::Result<()> {
     let (prefix, suffix) = SplitAscii::new(path, b'*').split_once();
 
     let (dir, prefix) = SplitAscii::new(prefix, b'/').rsplit_once();
@@ -753,7 +796,7 @@ pub fn expand_glob(
     debug("expand_glob(prefix)", prefix.as_bytes());
     debug("expand_glob(suffix)", suffix.as_bytes());
 
-    let fd = open_rdonly(libc::AT_FDCWD, dir)?;
+    let fd = open_rdonly(linux_raw_sys::general::AT_FDCWD, dir)?;
 
     let mut buf = unsafe {
         Box::<MaybeUninit<[u8; 4096]>, _>::assume_init(Box::<[u8; 4096], _>::new_zeroed_in(
@@ -766,11 +809,11 @@ pub fn expand_glob(
         ))
     };
 
-    let res = (|| -> std::io::Result<()> {
+    let res = (|| -> crate::io::Result<()> {
         loop {
             let len = unsafe { syscall!(SYS_getdents64, fd, buf.as_mut_ptr(), 4096) };
 
-            len.check().map_err(linux_err_into_io_err)?;
+            len.check()?;
 
             let len = len.as_usize_unchecked();
             if len == 0 {

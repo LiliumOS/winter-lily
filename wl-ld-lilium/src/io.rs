@@ -1,12 +1,18 @@
-use std::{io::BufRead, str::Utf8Error};
+use core::str::Utf8Error;
 
-use linux_errno::Error as SysError;
+pub use linux_errno::Error;
+use linux_errno::{EINTR, ENODATA};
+use linux_raw_sys::general::__kernel_off_t;
 use linux_syscall::{Result as _, SYS_lseek, SYS_read, syscall};
 
 use crate::helpers::copy_to_slice_head;
 
-pub fn linux_err_into_io_err(e: SysError) -> std::io::Error {
-    std::io::Error::from_raw_os_error(e.get() as i32)
+pub type Result<T> = core::result::Result<T, Error>;
+
+pub enum SeekFrom {
+    Start(u64),
+    End(i64),
+    Current(i64),
 }
 
 #[derive(Debug)]
@@ -33,10 +39,7 @@ impl BufFdReader {
 }
 
 impl BufFdReader {
-    pub fn read_line_static<'a>(
-        &mut self,
-        n: &'a mut [u8],
-    ) -> std::io::Result<Option<&'a mut str>> {
+    pub fn read_line_static<'a>(&mut self, n: &'a mut [u8]) -> Result<Option<&'a mut str>> {
         let mut pos = 0;
         loop {
             let (_, tail) = n.split_at_mut(pos);
@@ -68,26 +71,26 @@ impl BufFdReader {
     }
 }
 
-impl std::io::Seek for BufFdReader {
-    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
+impl BufFdReader {
+    pub fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
         self.pos = self.len;
 
         let (whence, pos) = match pos {
-            std::io::SeekFrom::Start(n) => (libc::SEEK_SET, n as libc::off_t),
-            std::io::SeekFrom::End(n) => (libc::SEEK_END, n as libc::off_t),
-            std::io::SeekFrom::Current(n) => (libc::SEEK_CUR, n as libc::off_t),
+            SeekFrom::Start(n) => (linux_raw_sys::general::SEEK_SET, n as __kernel_off_t),
+            SeekFrom::End(n) => (linux_raw_sys::general::SEEK_END, n as __kernel_off_t),
+            SeekFrom::Current(n) => (linux_raw_sys::general::SEEK_CUR, n as __kernel_off_t),
         };
 
         let res = unsafe { syscall!(SYS_lseek, self.fd, pos, whence) };
 
-        res.check().map_err(linux_err_into_io_err)?;
+        res.check()?;
 
         Ok(res.as_u64_unchecked())
     }
 }
 
-impl std::io::Read for BufFdReader {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+impl BufFdReader {
+    pub fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         let this_buf = self.fill_buf()?;
 
         let len = buf.len().min(this_buf.len());
@@ -97,14 +100,26 @@ impl std::io::Read for BufFdReader {
         self.consume(len);
         Ok(len)
     }
+
+    pub fn read_exact(&mut self, mut buf: &mut [u8]) -> Result<()> {
+        while !buf.is_empty() {
+            match self.read(buf) {
+                Ok(0) => return Err(ENODATA),
+                Ok(n) => buf = &mut buf[n..],
+                Err(EINTR) => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(())
+    }
 }
 
-impl std::io::BufRead for BufFdReader {
-    fn fill_buf(&mut self) -> std::io::Result<&[u8]> {
+impl BufFdReader {
+    pub fn fill_buf(&mut self) -> Result<&[u8]> {
         if self.pos == self.len {
             let res = unsafe { syscall!(SYS_read, self.fd, self.buf.as_ptr(), self.buf.len()) };
 
-            res.check().map_err(linux_err_into_io_err)?;
+            res.check()?;
 
             self.len = res.as_usize_unchecked();
             self.pos = 0;
@@ -113,7 +128,7 @@ impl std::io::BufRead for BufFdReader {
         Ok(self.buf())
     }
 
-    fn consume(&mut self, amt: usize) {
+    pub fn consume(&mut self, amt: usize) {
         self.pos += amt;
         if self.pos > self.len {
             panic!()
