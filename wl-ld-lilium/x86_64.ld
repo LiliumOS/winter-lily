@@ -235,4 +235,5 @@ SECTIONS
   .debug_sup      0 : { *(.debug_sup) }
   .gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
   /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
+  __vaddr_end = .;
 }

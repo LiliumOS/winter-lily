@@ -7,7 +7,8 @@
     try_trait_v2_residual,
     allocator_api,
     alloc_layout_extra,
-    naked_functions
+    naked_functions,
+    strict_provenance_atomic_ptr
 )]
 
 mod auxv;
@@ -18,6 +19,7 @@ mod entry;
 mod helpers;
 mod io;
 mod ldso;
+mod loader;
 mod resolver;
 
 mod env;

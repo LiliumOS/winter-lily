@@ -8,13 +8,15 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write, syscall};
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
 use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer};
+use crate::loader::LOADER;
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
 
 unsafe extern "C" {
-    unsafe static _DYNAMIC: ElfDyn;
+    safe static _DYNAMIC: ElfDyn;
     unsafe static mut __base_addr: c_void;
+    safe static __vaddr_end: c_void;
 }
 
 core::arch::global_asm! {
@@ -123,19 +125,30 @@ unsafe extern "C" fn __rust_entry(
     unsafe { __ENV.as_ptr().write(crate::helpers::SyncPointer(envp)) }
     let base_addr = safe_addr_of_mut!(__base_addr);
 
+    let end_addr = safe_addr_of!(__vaddr_end);
+
+    let native_region_base = end_addr.wrapping_sub(NATIVE_REGION_SIZE);
+
     unsafe {
         __MMAP_ADDR
             .as_ptr()
             .write(SyncPointer(base_addr.add(NATIVE_REGION_SIZE)))
     }
 
+    LOADER.native_base.store(
+        native_region_base.cast_mut(),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+
     let auxv =
         unsafe { NullTerm::<AuxEnt, usize>::from_ptr_unchecked(NonNull::new_unchecked(auxv)) };
 
     let mut rand = [0u8; 16];
 
+    let mut execfd = -1;
+
     unsafe { (&mut *RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
-    unsafe { (&mut *RESOLVER.as_ptr()).set_resolve_needed(lookup_soname) };
+    unsafe { (&mut *RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
     for auxent in auxv {
         match auxent.at_tag as c_ulong {
@@ -156,6 +169,10 @@ unsafe extern "C" fn __rust_entry(
                     unsafe { core::arch::asm!("ud2", options(noreturn)) }
                 }
             }
+            libc::AT_EXECFD => {
+                execfd = auxent.at_val.addr() as i32;
+            }
+
             _ => {}
         }
     }
@@ -172,7 +189,7 @@ unsafe extern "C" fn __rust_entry(
         RESOLVER.resolve_object(
             base_addr,
             arr,
-            &"ld-lilium-x86_64.so",
+            c"ld-lilium-x86_64.so",
             core::ptr::null_mut(),
         );
     }
