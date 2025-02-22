@@ -12,6 +12,24 @@
     strict_provenance_atomic_ptr
 )]
 
+macro_rules! println {
+    ($($tt:tt)*) => {
+        {
+            use ::core::fmt::Write as _;
+            ::core::writeln!($crate::io::STDOUT, $($tt)*).expect("Write to stdout failed")
+        }
+    };
+}
+
+macro_rules! eprintln {
+    ($($tt:tt)*) => {
+        {
+            use ::core::fmt::Write as _;
+            ::core::writeln!($crate::io::STDERR, $($tt)*).expect("Write to stdout failed")
+        }
+    };
+}
+
 extern crate alloc;
 
 #[panic_handler]

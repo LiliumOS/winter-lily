@@ -2,8 +2,8 @@ use core::str::Utf8Error;
 
 pub use linux_errno::Error;
 use linux_errno::{EINTR, ENODATA};
-use linux_raw_sys::general::__kernel_off_t;
-use linux_syscall::{Result as _, SYS_lseek, SYS_read, syscall};
+use linux_raw_sys::general::{__kernel_off_t, STDERR_FILENO, STDOUT_FILENO};
+use linux_syscall::{Result as _, SYS_lseek, SYS_read, SYS_write, syscall};
 
 use crate::helpers::copy_to_slice_head;
 
@@ -135,3 +135,16 @@ impl BufFdReader {
         }
     }
 }
+
+pub struct FdFormatter(u32);
+
+impl core::fmt::Write for FdFormatter {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let res = unsafe { syscall!(SYS_write, self.0, s.as_ptr(), s.len()) };
+
+        res.check().map_err(|_| core::fmt::Error)
+    }
+}
+
+pub const STDOUT: FdFormatter = FdFormatter(STDOUT_FILENO);
+pub const STDERR: FdFormatter = FdFormatter(STDERR_FILENO);
