@@ -28,6 +28,7 @@ pub mod alloc;
 compile_error!("We only support linux for now");
 
 #[non_exhaustive]
+#[repr(usize)]
 pub enum FilterMode {
     /// Use prctl to emulate syscalls
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -43,7 +44,12 @@ pub enum FilterMode {
 static SYS_INTERCEPT_STOP: AtomicI8 = AtomicI8::new(1);
 
 /// Initializes the process for winter-lily
-pub unsafe fn setup_process(wl_load_base: *mut u8, wl_load_size: usize, mode: FilterMode) {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __wl_impl_setup_process(
+    wl_load_base: *mut u8,
+    wl_load_size: usize,
+    mode: FilterMode,
+) {
     match mode {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         FilterMode::Prctl => {

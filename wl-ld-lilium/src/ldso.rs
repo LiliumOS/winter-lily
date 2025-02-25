@@ -6,12 +6,15 @@ use ld_so_impl::elf::consts::{ELFCLASS64, ELFMAG, ElfIdent};
 use ld_so_impl::elf::{EM_HOST, ElfClass, ElfHeader, ElfHost};
 use ld_so_impl::helpers::{cstr_from_ptr, strlen_impl};
 use ld_so_impl::hidden_syms;
+use ld_so_impl::loader::{Error, LoaderImpl};
 use linux_errno::{EACCES, ENOENT};
+use linux_raw_sys::general::AT_FDCWD;
 use linux_syscall::{Result as _, SYS_close, SYS_open, SYS_write, syscall};
 
 use bytemuck::Zeroable;
 
-use crate::env::get_env;
+use crate::entry::RESOLVER;
+use crate::env::{self, get_env};
 
 use crate::helpers::{
     FusedUnsafeCell, MmapAllocator, OnceLock, SyncPointer, copy_to_slice_head, debug, has_prefix,
@@ -73,6 +76,7 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Res
 }
 
 use crate::helpers::SplitAscii;
+use crate::loader::LOADER;
 
 #[inline(never)]
 fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'static str> {
@@ -181,4 +185,46 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
     }
 
     Err(ENOENT)
+}
+
+pub type Result<T> = core::result::Result<T, ld_so_impl::loader::Error>;
+
+pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) {
+    let udata = core::ptr::without_provenance_mut(SearchType::Host as usize);
+    let mut var_name = [0u8; 96];
+    let next = copy_to_slice_head(&mut var_name, "WL_SUBSYS_".as_bytes());
+    let len = 96 - copy_to_slice_head(next, name.as_bytes()).len();
+
+    let env_name = unsafe { core::str::from_utf8_unchecked(&var_name[..len]) };
+
+    let fhdl = if let Some(var) = env::get_env(env_name) {
+        if var.contains('/') {
+            let fd = open_rdonly(AT_FDCWD, var)
+                .unwrap_or_else(|_| RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound));
+
+            core::ptr::without_provenance_mut(fd as usize)
+        } else {
+            let override_soname = env::get_cenv(env_name).expect("Expected an env var");
+
+            unsafe {
+                LOADER.find(override_soname, udata).unwrap_or_else(|_| {
+                    RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound)
+                })
+            }
+        }
+    } else {
+        let next = copy_to_slice_head(&mut var_name, "libwl-lilium-".as_bytes());
+        let next = copy_to_slice_head(next, name.as_bytes());
+        copy_to_slice_head(next, ".so".as_bytes());
+
+        let soname = CStr::from_bytes_until_nul(&var_name).unwrap();
+
+        unsafe {
+            LOADER
+                .find(soname, udata)
+                .unwrap_or_else(|_| RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound))
+        }
+    };
+
+    unsafe { RESOLVER.load_from_handle(winter_soname, udata, fhdl) }
 }

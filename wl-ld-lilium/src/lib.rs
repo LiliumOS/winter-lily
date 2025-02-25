@@ -16,7 +16,7 @@ macro_rules! println {
     ($($tt:tt)*) => {
         {
             use ::core::fmt::Write as _;
-            ::core::writeln!($crate::io::STDOUT, $($tt)*).expect("Write to stdout failed")
+            ::core::writeln!(&$crate::io::STDOUT, $($tt)*).expect("Write to stdout failed");
         }
     };
 }
@@ -25,7 +25,7 @@ macro_rules! eprintln {
     ($($tt:tt)*) => {
         {
             use ::core::fmt::Write as _;
-            ::core::writeln!($crate::io::STDERR, $($tt)*).expect("Write to stdout failed")
+            ::core::writeln!(&$crate::io::STDERR, $($tt)*).expect("Write to stdout failed")
         }
     };
 }
@@ -38,7 +38,6 @@ fn panic_handler(_: &core::panic::PanicInfo) -> ! {
 }
 
 mod auxv;
-use core::ffi::c_char;
 
 use ld_so_impl::arch::crash_unrecoverably;
 use ld_so_impl::elf;
@@ -50,5 +49,3 @@ mod loader;
 mod resolver;
 
 mod env;
-
-use ld_so_impl::{safe_addr_of, safe_addr_of_mut};

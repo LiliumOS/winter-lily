@@ -56,7 +56,7 @@ impl LoaderImpl for FdLoader {
             (search, soname)
         };
         ldso::open_module(search, nname)
-            .map_err(|_| Error::Fatal)
+            .map_err(|_| Error::ObjectNotFound)
             .map(|v| core::ptr::without_provenance_mut(v as usize))
     }
 
@@ -99,14 +99,14 @@ impl LoaderImpl for FdLoader {
 
             if addr.map_addr(|v| v & !4095) <= last_pg_addr {
                 let res = unsafe { syscall!(SYS_mprotect, last_pg_addr, 4096, perms | last_perms) };
-                res.check().map_err(|_| Error::Fatal)?;
+                res.check().map_err(|_| Error::LoadError)?;
                 len = len.saturating_sub(4096);
                 addr = addr.map_addr(|v| (v + 4095) & !4095);
             }
 
             if len > 0 {
                 let res = unsafe { syscall!(SYS_mprotect, addr, len, perms) };
-                res.check().map_err(|_| Error::Fatal)?;
+                res.check().map_err(|_| Error::LoadError)?;
 
                 let end = addr.wrapping_add(len);
                 last_pg_addr = end.map_addr(|v| (v - 1) & !4095);
@@ -132,7 +132,7 @@ impl LoaderImpl for FdLoader {
                 linux_raw_sys::general::SEEK_SET
             )
         };
-        res.check().map_err(|_| Error::Fatal)?;
+        res.check().map_err(|_| Error::ReadError)?;
 
         while !sl.is_empty() {
             let res = unsafe { syscall!(SYS_read, fd, sl.as_mut_ptr(), sl.len()) };
@@ -142,7 +142,7 @@ impl LoaderImpl for FdLoader {
                     sl = &mut sl[..res.as_usize_unchecked()];
                 }
                 Err(EINTR) => continue,
-                Err(_) => return Err(Error::Fatal),
+                Err(_) => return Err(Error::ReadError),
             }
         }
         Ok(())
@@ -178,7 +178,7 @@ impl LoaderImpl for FdLoader {
             )
         };
 
-        res.check().map_err(|_| Error::Fatal)?;
+        res.check().map_err(|_| Error::AllocError)?;
 
         Ok(unsafe { core::ptr::with_exposed_provenance_mut(res.as_usize_unchecked()) })
     }

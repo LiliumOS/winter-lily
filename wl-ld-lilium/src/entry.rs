@@ -1,6 +1,9 @@
-use linux_syscall::syscall;
+use alloc::borrow::ToOwned;
+use ld_so_impl::loader::Error;
+use linux_raw_sys::general::O_RDONLY;
+use linux_syscall::{Result as _, SYS_openat, syscall};
 
-use core::ffi::{c_char, c_ulong, c_void};
+use core::ffi::{CStr, c_char, c_ulong, c_void};
 use core::ptr::NonNull;
 
 use ld_so_impl::arch::crash_unrecoverably;
@@ -9,18 +12,22 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
-use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer};
+use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_rdonly};
 use crate::loader::LOADER;
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
+
+const USAGE_TAIL: &str = "[OPTION]... <binary file> [args...]";
+
+const ARCH: &str = core::env!("ARCH");
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 
 unsafe extern "C" fn __rust_entry(
     argc: i32,
-    argv: *mut *mut c_char,
+    mut argv: *mut *mut c_char,
     envp: *mut *mut c_char,
     auxv: *mut AuxEnt,
     stack_addr: *mut c_void,
@@ -111,6 +118,95 @@ unsafe extern "C" fn __rust_entry(
 
     println!("Hello world");
 
+    if execfd == !0 {
+        if argc < 1 {
+            crash_unrecoverably()
+        }
+
+        let prg_name = core::str::from_utf8(unsafe { CStr::from_ptr(*argv) }.to_bytes())
+            .expect("UTF-8 Required");
+
+        argv = unsafe { argv.add(1) };
+        let mut args =
+            unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new_unchecked(argv)) };
+
+        let mut exec_name = None::<&CStr>;
+
+        let mut args = args
+            .by_ref()
+            .map(|&ptr| unsafe { CStr::from_ptr(ptr) })
+            .inspect(|v| debug("visit_argv", v.to_bytes()));
+
+        let mut argv0_override = None;
+
+        while let Some(arg) = args.next() {
+            match core::str::from_utf8(arg.to_bytes()) {
+                Ok("--help") => {
+                    println!("Usage: {prg_name} {USAGE_TAIL}");
+                    return 0;
+                }
+                Ok("--version") => {
+                    println!(
+                        "wl-ld-lilium-{ARCH}.so (VERSION {})",
+                        core::env!("CARGO_PKG_VERSION")
+                    );
+                    println!("winter-lily compatibility layer for linux");
+                    println!(
+                        "(C) 2025 Lilium Project Developers. This Project is released under the terms of the MIT and Apache-2.0 License"
+                    );
+                    return 0;
+                }
+                Ok("--argv0") => {
+                    let ptr = unsafe { argv.add(1).read() };
+
+                    argv0_override = Some(ptr);
+
+                    argv = unsafe { argv.add(2) };
+                }
+                Ok("--preload-subsystem") => todo!("--preload-subsystem"),
+                Ok("--preload-native") => todo!("--preload-native"),
+                Ok("--preload-lilium") => todo!("--preload-lilium"),
+                Ok(x) if x.starts_with("--") => {
+                    eprintln!(
+                        "Unknown Option {x}. Note that if this is a relative program name, use `./{x}` instead"
+                    );
+                    return 1;
+                }
+                Ok(_) | Err(_) => {
+                    exec_name = Some(arg);
+                    break;
+                }
+            }
+        }
+
+        if let Some(exec_name) = exec_name {
+            let fd = unsafe {
+                syscall!(
+                    SYS_openat,
+                    linux_raw_sys::general::AT_FDCWD,
+                    exec_name.as_ptr(),
+                    O_RDONLY
+                )
+            };
+
+            if let Err(e) = fd.check() {
+                eprintln!(
+                    "Failed to open {}: {:?}",
+                    unsafe { core::str::from_utf8_unchecked(exec_name.to_bytes()) },
+                    e
+                );
+                return 1;
+            }
+
+            execfd = fd.as_usize_unchecked() as i32;
+        } else {
+            eprintln!("Usage: {prg_name} {USAGE_TAIL}");
+            return 1;
+        }
+    }
+
+    ldso::load_subsystem("base", c"libusi-base.so");
+
     0
 }
 
@@ -128,40 +224,24 @@ pub const STACK_SIZE: usize = 4096 * 128;
 
 pub static RESOLVER: FusedUnsafeCell<Resolver> = FusedUnsafeCell::new(Resolver::ZERO);
 
-const RES_ERROR: &str = "Could not find: ";
+pub static WL_RESOLVER: FusedUnsafeCell<Resolver> = FusedUnsafeCell::new(Resolver::ZERO);
 
 const CANNOT_RUN_IN_SECURE: &str =
     "Cannot run winter-lily in secure mode (suid/sgid of target binary is set)";
 
-fn resolve_error(c: &core::ffi::CStr) -> ! {
+fn resolve_error(c: &core::ffi::CStr, e: Error) -> ! {
     let bytes = c.to_bytes();
-    let len = bytes.len();
-    let ptr = bytes.as_ptr();
 
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            RES_ERROR.as_ptr(),
-            RES_ERROR.len()
-        );
-    }
-    unsafe {
-        let _ = syscall!(SYS_write, linux_raw_sys::general::STDERR_FILENO, ptr, len);
-    }
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            &0x0Au8 as *const u8,
-            1
-        );
-    }
+    eprintln!(
+        "Could not find: {} ({:?})",
+        unsafe { core::str::from_utf8_unchecked(bytes) },
+        e
+    );
     unsafe {
         let _ = syscall!(SYS_exit, 1);
     }
     unsafe { core::arch::asm!("ud2", options(noreturn)) }
 }
 
-use crate::ldso::{__MMAP_ADDR, SearchType};
+use crate::ldso::{self, __MMAP_ADDR, SearchType};
 use crate::resolver::lookup_soname;

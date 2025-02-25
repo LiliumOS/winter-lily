@@ -5,7 +5,7 @@ use linux_errno::{EINTR, ENODATA};
 use linux_raw_sys::general::{__kernel_off_t, STDERR_FILENO, STDOUT_FILENO};
 use linux_syscall::{Result as _, SYS_lseek, SYS_read, SYS_write, syscall};
 
-use crate::helpers::copy_to_slice_head;
+use crate::helpers::{copy_to_slice_head, debug};
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -140,9 +140,22 @@ pub struct FdFormatter(u32);
 
 impl core::fmt::Write for FdFormatter {
     fn write_str(&mut self, s: &str) -> core::fmt::Result {
-        let res = unsafe { syscall!(SYS_write, self.0, s.as_ptr(), s.len()) };
+        (&mut &*self).write_str(s)
+    }
+}
 
-        res.check().map_err(|_| core::fmt::Error)
+impl core::fmt::Write for &FdFormatter {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let mut buf = s.as_bytes();
+
+        while !buf.is_empty() {
+            let res = unsafe { syscall!(SYS_write, self.0, s.as_ptr(), s.len()) };
+
+            res.check().map_err(|_| core::fmt::Error)?;
+
+            buf = &buf[res.as_usize_unchecked()..];
+        }
+        Ok(())
     }
 }
 

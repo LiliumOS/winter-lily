@@ -17,6 +17,27 @@ linux-raw-sys = { version = "0.8.0", default-features = false, features = [
     "no_std",
     "prctl",
 ] }
+rustix = { version = "0.38.44", default-features = false, features = [
+    "event",
+    "fs",
+    "io_uring",
+    "mm",
+    "mount",
+    "net",
+    "param",
+    "pipe",
+    "process",
+    "pty",
+    "rand",
+    "runtime",
+    "shm",
+    "stdio",
+    "system",
+    "termios",
+    "thread",
+    "time",
+    "linux_4_11",
+] }
 
 [lib]
 crate-type = ["cdylib"]

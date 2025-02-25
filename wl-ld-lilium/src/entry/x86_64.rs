@@ -7,7 +7,7 @@ core::arch::global_asm! {
     "pop r12",
     "xor rbp, rbp",
     "lea r13, [rsp]",
-    "lea r14, [rsp+8*rdi+8]",
+    "lea r14, [rsp+8*r12+8]",
     "mov r15, r14",
     "_start._find_auxv:",
     "mov rax, qword ptr [r15]",
@@ -27,12 +27,12 @@ core::arch::global_asm! {
     "mov rax, 9",
     "syscall",
     "mov rsp, rax",
-    "mov r8, rax",
+    "mov r8, rax", // stack_addr
     "add rsp, {STACK_SIZE}",
-    "mov rdi, r12",
-    "mov rsi, r13",
-    "mov rdx, r14",
-    "mov rcx, r15",
+    "mov rdi, r12", // argc
+    "mov rsi, r13", // argv
+    "mov rdx, r14", // envp
+    "mov rcx, r15", // auxv
     "call {rust_entry}",
     "mov edi, eax",
     "mov eax, 60",
