@@ -1,4 +1,4 @@
-use core::{ffi::c_void, sync::atomic::AtomicPtr};
+use core::{ffi::c_void, fmt::Write, sync::atomic::AtomicPtr};
 
 use ld_so_impl::{
     elf::{
@@ -13,6 +13,7 @@ use linux_syscall::{Result as _, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, sy
 
 use crate::{
     helpers::debug,
+    io::STDERR,
     ldso::{self, SearchType},
 };
 
@@ -181,6 +182,10 @@ impl LoaderImpl for FdLoader {
         res.check().map_err(|_| Error::AllocError)?;
 
         Ok(unsafe { core::ptr::with_exposed_provenance_mut(res.as_usize_unchecked()) })
+    }
+
+    fn write_str(&self, st: &str) -> core::fmt::Result {
+        { STDERR }.write_str(st)
     }
 }
 

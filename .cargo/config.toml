@@ -6,7 +6,6 @@ rustflags = [
     "relro-level=off",
     "-Ztls-model=initial-exec",
 ]
-target = ["x86_64-unknown-linux-gnu"]
 
 [unstable]
 # build-std = ["core", "alloc", "panic_abort", "std"]

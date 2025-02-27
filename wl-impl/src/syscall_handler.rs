@@ -4,8 +4,8 @@ use crate::syscall_helpers::SysCallTyErased;
 use core::convert::Infallible;
 use lilium_sys::sys::result::SysResult;
 
-static SYSCALL_SUBSYS_ARRAY: [AtomicPtr<[Option<SysCallTyErased>; 4096]>; 8] =
-    [const { AtomicPtr::new(core::ptr::null_mut()) }; 8];
+static SYSCALL_SUBSYS_ARRAY: [AtomicPtr<[Option<SysCallTyErased>; 4096]>; 64] =
+    [const { AtomicPtr::new(core::ptr::null_mut()) }; 64];
 
 pub unsafe fn register_subsys(subsys: usize, arr: &'static [Option<SysCallTyErased>; 4096]) {
     SYSCALL_SUBSYS_ARRAY[subsys].store(

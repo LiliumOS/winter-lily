@@ -205,6 +205,9 @@ unsafe extern "C" fn __rust_entry(
         }
     }
 
+    unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
+    unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
+
     ldso::load_subsystem("base", c"libusi-base.so");
 
     0
@@ -243,5 +246,4 @@ fn resolve_error(c: &core::ffi::CStr, e: Error) -> ! {
     unsafe { core::arch::asm!("ud2", options(noreturn)) }
 }
 
-use crate::ldso::{self, __MMAP_ADDR, SearchType};
-use crate::resolver::lookup_soname;
+use crate::ldso::{self, __MMAP_ADDR};
