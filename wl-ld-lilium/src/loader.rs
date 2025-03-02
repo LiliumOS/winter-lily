@@ -106,7 +106,8 @@ impl LoaderImpl for FdLoader {
             }
 
             if len > 0 {
-                let res = unsafe { syscall!(SYS_mprotect, addr, len, perms) };
+                let res =
+                    unsafe { syscall!(SYS_mprotect, addr.map_addr(|v| v & !4095), len, perms) };
                 res.check().map_err(|_| Error::LoadError)?;
 
                 let end = addr.wrapping_add(len);
@@ -140,9 +141,13 @@ impl LoaderImpl for FdLoader {
 
             match res.check() {
                 Ok(()) => {
-                    sl = &mut sl[..res.as_usize_unchecked()];
+                    let num = res.as_usize_unchecked();
+                    if num == 0 {
+                        return Err(Error::ReadError);
+                    }
+                    sl = &mut sl[num..];
                 }
-                Err(EINTR) => continue,
+                // Err(EINTR) => continue,
                 Err(_) => return Err(Error::ReadError),
             }
         }
@@ -161,19 +166,20 @@ impl LoaderImpl for FdLoader {
             SearchType::Winter => &self.winter_base,
         };
 
-        let addr = base.fetch_byte_add(
-            (max_pma as usize + 4095) & !4095,
-            core::sync::atomic::Ordering::Relaxed,
-        );
+        let length = (max_pma as usize + 4095) & !4095;
+
+        let addr = base.fetch_byte_add(length, core::sync::atomic::Ordering::Relaxed);
+        eprintln!("Load adder {addr:p}");
         // Eventually I'll do better loading opts.
         let res = unsafe {
             syscall!(
                 SYS_mmap,
                 addr,
+                length,
                 linux_raw_sys::general::PROT_READ | linux_raw_sys::general::PROT_WRITE,
                 linux_raw_sys::general::MAP_PRIVATE
                     | linux_raw_sys::general::MAP_ANONYMOUS
-                    | linux_raw_sys::general::MAP_FIXED,
+                    | linux_raw_sys::general::MAP_FIXED_NOREPLACE,
                 -1i32,
                 0
             )

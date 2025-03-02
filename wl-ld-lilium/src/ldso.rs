@@ -156,6 +156,8 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
                     Err(e) => continue,
                 }
 
+                eprintln!("{header:#x?}");
+
                 if header.e_ident.ei_class != ElfHost::EI_CLASS {
                     continue;
                 }

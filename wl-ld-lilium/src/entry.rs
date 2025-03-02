@@ -46,6 +46,8 @@ unsafe extern "C" fn __rust_entry(
     let base_addr = safe_addr_of_mut!(__base_addr);
 
     let end_addr = safe_addr_of!(__vaddr_end);
+    let off = end_addr.align_offset(4096);
+    let end_addr = end_addr.wrapping_byte_add(off);
 
     let native_region_base = end_addr.wrapping_sub(NATIVE_REGION_SIZE);
 
@@ -210,6 +212,10 @@ unsafe extern "C" fn __rust_entry(
 
     ldso::load_subsystem("base", c"libusi-base.so");
 
+    let sym = RESOLVER.find_sym(c"__wl_impl_setup_process");
+
+    eprintln!("Found __wl_impl_setup_process: {:p}", sym);
+
     0
 }
 
@@ -219,7 +225,7 @@ unsafe extern "C" {
     safe static __vaddr_end: c_void;
 }
 
-pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 8;
+pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 16;
 
 pub const STACK_DISPLACEMENT: usize = 4096 * 8;
 

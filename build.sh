@@ -14,6 +14,6 @@ fi
 
 CARGO_TARGET_DIR="$(pwd)/target"
 
-cargo build --target "$TARGET" $CARGOFLAGS
+cargo build -Z build-std="core,alloc,std" --target "$TARGET" $CARGOFLAGS
 
 (cd wl-ld-lilium && cargo build --target-dir "$CARGO_TARGET_DIR")

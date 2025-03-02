@@ -1,3 +1,5 @@
+use core::arch::naked_asm;
+
 use super::*;
 
 core::arch::global_asm! {
@@ -43,4 +45,24 @@ core::arch::global_asm! {
     STACK_SIZE = const STACK_SIZE,
     MMAP_PROT = const const {linux_raw_sys::general::PROT_READ | linux_raw_sys::general::PROT_WRITE },
     MMAP_FLAGS = const const { linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_ANONYMOUS | linux_raw_sys::general::MAP_GROWSDOWN | linux_raw_sys::general::MAP_STACK }
+}
+
+#[naked]
+pub unsafe extern "sysv64" fn __call_entry_point(
+    argc: usize,            /* rdi */
+    argv: *mut *mut c_char, /* rsi */
+    envp: *mut *mut c_char, /* rdx */
+    numenv: usize,          /* rcx */
+    auxv: *mut AuxEnt,      /* r8 */
+    numaux: usize,          /* r9 */
+    entry: *const c_void,   /* rsp[-8] */
+) -> ! {
+    unsafe {
+        naked_asm! {
+            "pop rax",
+            "pop rax",
+            "sub rsp, "
+
+        }
+    }
 }
