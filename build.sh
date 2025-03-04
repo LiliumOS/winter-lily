@@ -28,7 +28,12 @@ build_autotools(){
     SRC_DIR="$(pwd)/$2"
     shift 2
 
-    mkdir "$BUILD_DIR" && (cd "$BUILD_DIR" && PATH="$PREFIX/bin:$PATH" "$SRC_DIR/configure" --target "${TARGET_RUST}" --prefix "$PREFIX" --exec-prefix "$PREFIX" "$@") && make -C "$BUILD_DIR" -j"$NPROC" && make -C "$BUILD_DIR" -s install
+    if mkdir "$BUILD_DIR"
+    then
+        (cd "$BUILD_DIR" && PATH="$PREFIX/bin:$PATH" "$SRC_DIR/configure" --target "${TARGET_RUST}" --prefix "$PREFIX" --exec-prefix "$PREFIX" "$@") && make -C "$BUILD_DIR" -j"$NPROC" && make -C "$BUILD_DIR" -s install
+    else
+        true
+    fi
     return $?
 }
 
