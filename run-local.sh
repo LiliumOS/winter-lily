@@ -1,12 +1,8 @@
-#!/bin/sh
+#!/bin/bash
 
+. ./target.sh
 
 TARGET_PATH=debug
-
-if [ "$TARGET" \= "" ]
-then
-   TARGET="$(rustc --print host-tuple)"
-fi
 
 if [ "$RELEASE" != "" ]
 then
@@ -16,5 +12,5 @@ TARGET="$TARGET" ./build.sh
 
 echo "$@"
 . ./local-env.sh
-exec target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
+exec target/${TARGET_LD}/${TARGET_PATH}/libwl_ld_lilium.so "$@"
 
