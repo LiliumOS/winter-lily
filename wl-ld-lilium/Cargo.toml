@@ -10,7 +10,7 @@ lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-featu
     "bytemuck",
 ] }
 fake-enum = "0.1.4"
-ld-so-impl = { path = "ld-so-impl" }
+ld-so-impl = { path = "ld-so-impl", features = ["deny-wx", "tls"] }
 linux-errno = "1.0.1"
 linux-raw-sys = { version = "0.8.0", default-features = false, features = [
     "general",
@@ -38,6 +38,8 @@ rustix = { version = "0.38.44", default-features = false, features = [
     "time",
     "linux_4_11",
 ] }
+wl-interface-map = { path = "../wl-interface-map" }
+lccc-siphash = { git = "https://github.com/lccc-project/lccc-siphash.git", version = "0.1.0" }
 
 [lib]
 crate-type = ["cdylib"]

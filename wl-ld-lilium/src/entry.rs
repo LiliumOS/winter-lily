@@ -1,4 +1,5 @@
 use alloc::borrow::ToOwned;
+use lccc_siphash::{RawSipHasher, SipHashState};
 use ld_so_impl::loader::Error;
 use linux_raw_sys::general::O_RDONLY;
 use linux_syscall::{Result as _, SYS_openat, syscall};
@@ -14,6 +15,7 @@ use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
 use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_rdonly};
 use crate::loader::LOADER;
+use crate::rand::Gen;
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
@@ -118,6 +120,14 @@ unsafe extern "C" fn __rust_entry(
         );
     }
 
+    let mut rand = Gen::seed(rand);
+
+    let lilium_base_addr = core::ptr::without_provenance_mut((rand.next() as usize) & SLIDE_MASK);
+
+    LOADER
+        .winter_base
+        .store(lilium_base_addr, core::sync::atomic::Ordering::Relaxed);
+
     println!("Hello world");
 
     if execfd == !0 {
@@ -210,11 +220,30 @@ unsafe extern "C" fn __rust_entry(
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
-    ldso::load_subsystem("base", c"libusi-base.so");
+    let base = ldso::load_subsystem("base", c"libusi-base.so");
 
     let sym = RESOLVER.find_sym(c"__wl_impl_setup_process");
 
     eprintln!("Found __wl_impl_setup_process: {:p}", sym);
+
+    let setup_process: wl_interface_map::SetupProcessTy = unsafe { core::mem::transmute(sym) };
+
+    unsafe {
+        setup_process(
+            native_region_base.cast_mut().cast(),
+            NATIVE_REGION_SIZE,
+            wl_interface_map::FilterMode::Prctl,
+        )
+    }
+
+    let base_init_subsystem = RESOLVER.find_sym_in(c"__init_subsystem", base);
+
+    eprintln!("Found libusi-base.so:__base {base_init_subsystem:p}");
+
+    let base_init_subsystem: wl_interface_map::InitSubsystemTy =
+        unsafe { core::mem::transmute(base_init_subsystem) };
+
+    // base_init_subsystem();
 
     0
 }
@@ -224,6 +253,8 @@ unsafe extern "C" {
     unsafe static mut __base_addr: c_void;
     safe static __vaddr_end: c_void;
 }
+
+pub const SLIDE_MASK: usize = (4096 * 8 - 1) << 12;
 
 pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 16;
 

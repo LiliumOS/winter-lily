@@ -27,17 +27,7 @@ pub mod alloc;
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");
 
-#[non_exhaustive]
-#[repr(usize)]
-pub enum FilterMode {
-    /// Use prctl to emulate syscalls
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    Prctl,
-    /// Use `seccomp`, instead of prctl.
-    /// Note that this does not imply full permission enforcement - only Linux level permissions are used by default.
-    ///
-    Seccomp,
-}
+pub use wl_interface_map::*;
 
 #[thread_local]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -69,8 +59,12 @@ pub unsafe extern "C" fn __wl_impl_setup_process(
             }
         }
         FilterMode::Seccomp => todo!(),
+        _ => todo!(),
     }
 }
+
+// Statically check that `wl_impl_setup_process` has the right type
+const _: SetupProcessTy = __wl_impl_setup_process;
 
 pub const LILIUM_TARGET: &str = core::env!("WL_LILIUM_TARGET");
 

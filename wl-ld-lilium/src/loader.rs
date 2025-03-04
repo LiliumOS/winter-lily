@@ -68,22 +68,7 @@ impl LoaderImpl for FdLoader {
         base_addr: *mut core::ffi::c_void,
     ) -> Result<*mut core::ffi::c_void, Error> {
         debug("map_phdrs", b"entry");
-        for phdr in phdr {
-            if phdr.p_type != PT_LOAD {
-                continue;
-            }
-
-            let paddr = base_addr.wrapping_offset(phdr.p_paddr as isize);
-
-            let off = phdr.p_offset;
-            let file_len = phdr.p_filesz as usize;
-
-            let ptr = unsafe { core::slice::from_raw_parts_mut(paddr.cast(), file_len) };
-
-            self.read_offset(off, map_desc, ptr)?;
-        }
-
-        let mut last_pg_addr = base_addr;
+        let mut last_addr: *mut c_void = core::ptr::without_provenance_mut(0);
         let mut last_perms = 0;
 
         for phdr in phdr {
@@ -98,7 +83,22 @@ impl LoaderImpl for FdLoader {
                 perms |= linux_raw_sys::general::PROT_EXEC;
             }
 
+            let last_pg_addr = last_addr.map_addr(|v| v & !4095);
+
             if addr.map_addr(|v| v & !4095) <= last_pg_addr {
+                let res = unsafe {
+                    syscall!(
+                        SYS_mprotect,
+                        last_pg_addr,
+                        4096,
+                        linux_raw_sys::general::PROT_READ | linux_raw_sys::general::PROT_WRITE
+                    )
+                };
+                res.check().map_err(|_| Error::LoadError)?;
+                let size = addr.align_offset(4096).min(phdr.p_filesz as usize);
+                let ptr = unsafe { core::slice::from_raw_parts_mut(addr.cast::<u8>(), size) };
+                self.read_offset(phdr.p_offset, map_desc, ptr)?;
+
                 let res = unsafe { syscall!(SYS_mprotect, last_pg_addr, 4096, perms | last_perms) };
                 res.check().map_err(|_| Error::LoadError)?;
                 len = len.saturating_sub(4096);
@@ -106,12 +106,24 @@ impl LoaderImpl for FdLoader {
             }
 
             if len > 0 {
-                let res =
-                    unsafe { syscall!(SYS_mprotect, addr.map_addr(|v| v & !4095), len, perms) };
+                if addr.addr() & 4095 != (phdr.p_offset as usize) & 4095 {
+                    todo!()
+                }
+                let res = unsafe {
+                    syscall!(
+                        SYS_mmap,
+                        addr.map_addr(|v| v & !4095),
+                        len,
+                        perms,
+                        linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_FIXED,
+                        map_desc.addr() as i32,
+                        phdr.p_offset & !4095
+                    )
+                };
                 res.check().map_err(|_| Error::LoadError)?;
 
                 let end = addr.wrapping_add(len);
-                last_pg_addr = end.map_addr(|v| (v - 1) & !4095);
+                last_addr = end.wrapping_sub(1);
                 last_perms = perms;
             }
         }

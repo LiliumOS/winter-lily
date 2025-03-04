@@ -7,6 +7,7 @@ use ld_so_impl::elf::{EM_HOST, ElfClass, ElfHeader, ElfHost};
 use ld_so_impl::helpers::{cstr_from_ptr, strlen_impl};
 use ld_so_impl::hidden_syms;
 use ld_so_impl::loader::{Error, LoaderImpl};
+use ld_so_impl::resolver::DynEntry;
 use linux_errno::{EACCES, ENOENT};
 use linux_raw_sys::general::AT_FDCWD;
 use linux_syscall::{Result as _, SYS_close, SYS_open, SYS_write, syscall};
@@ -201,7 +202,7 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
 
 pub type Result<T> = core::result::Result<T, ld_so_impl::loader::Error>;
 
-pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) {
+pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'static DynEntry {
     let udata = core::ptr::without_provenance_mut(SearchType::Host as usize);
     let mut var_name = [0u8; 96];
     let next = copy_to_slice_head(&mut var_name, "WL_SUBSYS_".as_bytes());

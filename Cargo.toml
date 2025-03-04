@@ -1,6 +1,6 @@
 [workspace]
 members = ["wl-impl", "wl-usi-base", "wl-usi-io"]
-exclude = ["wl-ld-lilium"]
+exclude = ["wl-ld-lilium", "wl-interface-map"]
 resolver = "3"
 
 [workspace.package]

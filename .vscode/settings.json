@@ -5,6 +5,7 @@
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
         "wl-ld-lilium/Cargo.toml",
-        "wl-ld-lilium/ld-so-impl/Cargo.toml"
+        "wl-ld-lilium/ld-so-impl/Cargo.toml",
+        "wl-interface-map/Cargo.toml"
     ]
 }

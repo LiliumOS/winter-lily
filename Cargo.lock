@@ -392,7 +392,12 @@ dependencies = [
  "lilium-sys",
  "linux-syscall",
  "memchr",
+ "wl-interface-map",
 ]
+
+[[package]]
+name = "wl-interface-map"
+version = "0.1.0"
 
 [[package]]
 name = "wl-usi-base"

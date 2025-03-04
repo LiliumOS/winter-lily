@@ -12,6 +12,7 @@ memchr = "2.7.4"
 linux-syscall.workspace = true
 git-version = "0.3.9"
 dashmap = "6.1.0"
+wl-interface-map = { path = "../wl-interface-map" }
 
 [lib]
 crate-type = ["dylib"]

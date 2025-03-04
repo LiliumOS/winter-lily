@@ -8,7 +8,7 @@ if [ "$RELEASE" != "" ]
 then
     TARGET_PATH=release
 fi
-TARGET="$TARGET" ./build.sh
+TARGET="$TARGET" ./build.sh || exit $?
 
 echo "$@"
 . ./local-env.sh
