@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ "$GDB" \= "" ]
 then
@@ -6,6 +6,8 @@ then
 fi
 
 . ./target.sh
+
+TARGET_PATH="debug"
 
 if [ "$RELEASE" != "" ]
 then
