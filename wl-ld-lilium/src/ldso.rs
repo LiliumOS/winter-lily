@@ -41,6 +41,8 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Res
             None => break,
         };
 
+        eprintln!("{str}");
+
         let st = SplitAscii::new(str, b'#').split_once().0.trim_ascii();
 
         if st.is_empty() {
@@ -117,13 +119,18 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
 
     let path = match search {
         SearchType::Host => __LDSO_HOST_SEARCH_LIST
-            .get_or_try_init(|| init_cache_slow("LD_LIBRARY_PATH_WL_HOST", "/etc/ld.so.conf"))
+            .get_or_try_init(|| {
+                init_cache_slow(
+                    "LD_LIBRARY_PATH_WL_HOST",
+                    get_env("WL_NATIVE_LD_SO_CONF").unwrap_or("/etc/ld.so.conf"),
+                )
+            })
             .copied(),
         SearchType::Winter => __LDSO_LILIUM_SEARCH_LIST
             .get_or_try_init(|| {
                 init_cache_slow(
                     "LD_LIBRARY_PATH_WL_LILIUM",
-                    get_env("WL_SYSROOT_LD_SO_CONF").unwrap_or("ld-lilium.so.conf"),
+                    get_env("WL_SYSROOT_LD_SO_CONF").unwrap_or("/etc/ld-lilium.so.conf"),
                 )
             })
             .copied(),
@@ -132,6 +139,9 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
     let path = path?;
 
     for p in SplitAscii::new(path, b'\x1E') {
+        eprintln!("{}: Searching: {p}", unsafe {
+            core::str::from_utf8_unchecked(name.to_bytes())
+        });
         let vbuf = copy_to_slice_head(&mut buf, p.as_bytes());
         vbuf[0] = b'/';
         let vbuf = copy_to_slice_head(&mut vbuf[1..], name.to_bytes());

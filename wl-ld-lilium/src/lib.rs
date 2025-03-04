@@ -43,6 +43,7 @@ use ld_so_impl::arch::crash_unrecoverably;
 use ld_so_impl::elf;
 mod entry;
 mod helpers;
+mod iface;
 mod io;
 mod ldso;
 mod loader;
