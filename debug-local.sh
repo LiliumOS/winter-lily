@@ -18,5 +18,13 @@ TARGET="$TARGET" ./build.sh
 
 . ./local-env.sh
 
-exec $GDB $GDBARGS --args target/${TARGET_LD}/${TARGET_PATH}/libwl_ld_lilium.so "$@"
-
+if [[ "$GDB" == *"rr"* ]]
+then
+    if [[ "$GDB" != *"record"* ]]
+    then
+        GDB="$GDB record" # use "rr record" if the user didn't try to outsmart us
+    fi
+    exec $GDB $GDBARGS target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
+else
+    exec $GDB $GDBARGS --args target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
+fi
