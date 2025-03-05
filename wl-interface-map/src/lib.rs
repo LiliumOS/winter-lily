@@ -16,3 +16,23 @@ pub type SetupProcessTy =
     unsafe extern "C" fn(wl_load_base: *mut u8, wl_load_size: usize, mode: FilterMode);
 
 pub type InitSubsystemTy = extern "C" fn();
+
+#[macro_export]
+macro_rules! wl_setup_process_name {
+    () => {
+        "__wl_init_setup_process"
+    };
+    (C) => {
+        c"__wl_init_setup_process"
+    };
+}
+
+#[macro_export]
+macro_rules! wl_init_subsystem_name {
+    () => {
+        "__wl_init_subsystem"
+    };
+    (C) => {
+        c"__wl_init_subsystem"
+    };
+}

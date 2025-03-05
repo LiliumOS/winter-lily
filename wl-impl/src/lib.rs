@@ -34,7 +34,7 @@ pub use wl_interface_map::*;
 static SYS_INTERCEPT_STOP: AtomicI8 = AtomicI8::new(1);
 
 /// Initializes the process for winter-lily
-#[unsafe(no_mangle)]
+#[unsafe(export_name = wl_setup_process_name!())]
 pub unsafe extern "C" fn __wl_impl_setup_process(
     wl_load_base: *mut u8,
     wl_load_size: usize,

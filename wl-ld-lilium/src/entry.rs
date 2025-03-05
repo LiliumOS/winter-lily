@@ -3,6 +3,7 @@ use lccc_siphash::{RawSipHasher, SipHashState};
 use ld_so_impl::loader::Error;
 use linux_raw_sys::general::O_RDONLY;
 use linux_syscall::{Result as _, SYS_openat, syscall};
+use wl_interface_map::wl_setup_process_name;
 
 use core::ffi::{CStr, c_char, c_ulong, c_void};
 use core::ptr::NonNull;
@@ -115,7 +116,7 @@ unsafe extern "C" fn __rust_entry(
         RESOLVER.resolve_object(
             base_addr,
             arr,
-            c"ld-lilium-x86_64.so",
+            Some(c"ld-lilium-x86_64.so"),
             core::ptr::null_mut(),
         );
     }
@@ -222,7 +223,7 @@ unsafe extern "C" fn __rust_entry(
 
     let base = ldso::load_subsystem("base", c"libusi-base.so");
 
-    let sym = RESOLVER.find_sym(c"__wl_impl_setup_process");
+    let sym = RESOLVER.find_sym(wl_setup_process_name!(C));
 
     eprintln!("Found __wl_impl_setup_process: {:p}", sym);
 

@@ -1,4 +1,5 @@
 use core::{arch::global_asm, ffi::c_void, sync::atomic::AtomicPtr};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::syscall_helpers::SysCallTyErased;
 use core::convert::Infallible;
@@ -7,7 +8,21 @@ use lilium_sys::sys::result::SysResult;
 static SYSCALL_SUBSYS_ARRAY: [AtomicPtr<[Option<SysCallTyErased>; 4096]>; 64] =
     [const { AtomicPtr::new(core::ptr::null_mut()) }; 64];
 
+static NEXT_DYN_SUBSYS: AtomicUsize = AtomicUsize::new(8);
+
 pub unsafe fn register_subsys(subsys: usize, arr: &'static [Option<SysCallTyErased>; 4096]) {
+    let subsys = if subsys == !0 {
+        let val = NEXT_DYN_SUBSYS.fetch_add(1, Ordering::Relaxed);
+        if val > SYSCALL_SUBSYS_ARRAY.len() {
+            panic!(
+                "Cannot register more than {} subsystems",
+                SYSCALL_SUBSYS_ARRAY.len()
+            )
+        }
+        val
+    } else {
+        subsys
+    };
     SYSCALL_SUBSYS_ARRAY[subsys].store(
         core::ptr::from_ref(arr).cast_mut(),
         core::sync::atomic::Ordering::Release,
@@ -60,4 +75,17 @@ macro_rules! erase {
         > = unsafe { core::mem::transmute(__val as *mut ()) };
         __res
     }};
+}
+
+#[macro_export]
+macro_rules! def_subsystem{
+    ($syscalls:ident) => {
+        const _: () = {
+            #[unsafe(export_name = $crate::wl_init_subsystem_name!())]
+            pub extern "C" fn __init_subsystem() {
+                $crate::syscall_handler::
+            }
+        };
+
+    };
 }

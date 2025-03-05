@@ -239,5 +239,5 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
         }
     };
 
-    unsafe { RESOLVER.load_from_handle(winter_soname, udata, fhdl) }
+    unsafe { RESOLVER.load_from_handle(Some(winter_soname), udata, fhdl) }
 }

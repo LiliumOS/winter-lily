@@ -1,7 +1,11 @@
-use core::ffi::c_void;
+use core::{arch::global_asm, ffi::c_void};
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn _ITM_deregisterTMCloneTable(_: *mut c_void) {}
 
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn _ITM_registerTMCloneTable(_: *mut c_void, _: usize) {}
+#[cfg(target_arch = "x86_64")]
+global_asm!{
+    ".global __tls_get_addr",
+    ".protected __tls_get_addr",
+    "__tls_get_addr:",
+    ""
+}
+
