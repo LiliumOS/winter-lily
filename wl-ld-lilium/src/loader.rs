@@ -1,4 +1,8 @@
-use core::{ffi::c_void, fmt::Write, sync::atomic::AtomicPtr};
+use core::{
+    ffi::c_void,
+    fmt::Write,
+    sync::atomic::{AtomicPtr, AtomicUsize},
+};
 
 use ld_so_impl::{
     elf::{
@@ -8,18 +12,23 @@ use ld_so_impl::{
     loader::{Error, LoaderImpl},
 };
 use linux_errno::EINTR;
-use linux_raw_sys::general::__kernel_off_t;
-use linux_syscall::{Result as _, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, syscall};
+use linux_raw_sys::general::{__kernel_off_t, ARCH_SET_FS, PROT_READ, PROT_WRITE};
+use linux_syscall::{
+    Result as _, SYS_arch_prctl, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, syscall,
+};
 
 use crate::{
+    entry::TLS_BLOCK_SIZE,
     helpers::debug,
     io::STDERR,
+    is_x86_feature_detected,
     ldso::{self, SearchType},
 };
 
 pub struct FdLoader {
     pub native_base: AtomicPtr<c_void>,
     pub winter_base: AtomicPtr<c_void>,
+    pub tls_off: AtomicUsize,
 }
 
 impl LoaderImpl for FdLoader {
@@ -205,9 +214,69 @@ impl LoaderImpl for FdLoader {
     fn write_str(&self, st: &str) -> core::fmt::Result {
         { STDERR }.write_str(st)
     }
+
+    fn alloc_tls(&self, tls_size: usize) -> Result<usize, Error> {
+        let val = self
+            .tls_off
+            .fetch_add(tls_size, core::sync::atomic::Ordering::Relaxed);
+
+        if (val + tls_size) > (TLS_BLOCK_SIZE >> 1) {
+            return Err(Error::AllocError);
+        }
+
+        let pg = get_tp().map_addr(|a| a + (val & !4095));
+
+        let res = unsafe { syscall!(SYS_mprotect, pg, tls_size, PROT_READ | PROT_WRITE) };
+
+        res.check().map_err(|_| Error::AllocError)?;
+        Ok(val)
+    }
+
+    fn tls_direct_offset(&self, module: usize) -> Result<usize, Error> {
+        Ok(module) // every module is valid for offset
+    }
+
+    fn load_tls(
+        &self,
+        tls_module: usize,
+        desc: *mut c_void,
+        off: ElfOffset,
+        sz: ElfSize,
+    ) -> Result<(), Error> {
+        // TODO: Load Master Copy and mark as dirty for other threads
+        let tp = get_tp();
+
+        let module = tp.wrapping_add(tls_module);
+
+        let sl = unsafe { core::slice::from_raw_parts_mut(module.cast::<u8>(), sz as usize) };
+
+        self.read_offset(off, desc, sl)
+    }
 }
 
 pub static LOADER: FdLoader = FdLoader {
     native_base: AtomicPtr::new(core::ptr::null_mut()),
     winter_base: AtomicPtr::new(core::ptr::null_mut()),
+    tls_off: AtomicUsize::new(0),
 };
+
+pub fn set_tp(ptr: *mut c_void) {
+    cfg_match::cfg_match! {
+        target_arch = "x86_64" => if is_x86_feature_detected!("fsgsbase"){
+            unsafe { core::arch::asm!("wrfsbase {ptr}", ptr = in(reg) ptr, options(preserves_flags))}
+        } else {
+            unsafe { let _ = syscall!(SYS_arch_prctl, ARCH_SET_FS, ptr.expose_provenance());}
+        },
+
+    }
+}
+
+pub fn get_tp() -> *mut c_void {
+    let val: *mut c_void;
+    cfg_match::cfg_match! {
+        target_arch = "x86_64" =>
+            unsafe { core::arch::asm!("lea {val}, fs:[0]", val = out(reg) val, options(readonly, pure, preserves_flags))}
+        ,
+    }
+    val
+}

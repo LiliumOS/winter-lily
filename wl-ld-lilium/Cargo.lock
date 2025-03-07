@@ -298,6 +298,7 @@ name = "wl-ld-lilium"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+ "cfg-match",
  "fake-enum",
  "lccc-siphash",
  "ld-so-impl",

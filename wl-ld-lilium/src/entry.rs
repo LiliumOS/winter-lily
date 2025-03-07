@@ -1,8 +1,8 @@
 use alloc::borrow::ToOwned;
 use lccc_siphash::{RawSipHasher, SipHashState};
 use ld_so_impl::loader::Error;
-use linux_raw_sys::general::O_RDONLY;
-use linux_syscall::{Result as _, SYS_openat, syscall};
+use linux_raw_sys::general::{MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE};
+use linux_syscall::{Result as _, SYS_mmap, SYS_openat, Syscall, syscall};
 use wl_interface_map::wl_setup_process_name;
 
 use core::ffi::{CStr, c_char, c_ulong, c_void};
@@ -15,7 +15,7 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
 use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_rdonly};
-use crate::loader::LOADER;
+use crate::loader::{LOADER, set_tp};
 use crate::rand::Gen;
 use crate::{env::__ENV, resolver};
 
@@ -118,6 +118,7 @@ unsafe extern "C" fn __rust_entry(
             arr,
             Some(c"ld-lilium-x86_64.so"),
             core::ptr::null_mut(),
+            !0,
         );
     }
 
@@ -218,6 +219,25 @@ unsafe extern "C" fn __rust_entry(
         }
     }
 
+    let init_tls_block = unsafe {
+        syscall!(
+            SYS_mmap,
+            core::ptr::null_mut::<c_void>(),
+            TLS_BLOCK_SIZE,
+            PROT_NONE,
+            MAP_PRIVATE | MAP_ANONYMOUS
+        )
+    };
+
+    if init_tls_block.check().is_err() {
+        crash_unrecoverably();
+    }
+
+    let init_tls_block =
+        core::ptr::with_exposed_provenance_mut::<c_void>(init_tls_block.as_usize_unchecked());
+
+    set_tp(init_tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1));
+
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
@@ -260,6 +280,8 @@ pub const SLIDE_MASK: usize = (4096 * 8 - 1) << 12;
 pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 16;
 
 pub const STACK_DISPLACEMENT: usize = 4096 * 8;
+
+pub const TLS_BLOCK_SIZE: usize = 4096 * 4096 * 4;
 
 pub const STACK_SIZE: usize = 4096 * 128;
 

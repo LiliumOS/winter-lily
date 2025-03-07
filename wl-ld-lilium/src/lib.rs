@@ -50,4 +50,5 @@ mod loader;
 mod rand;
 mod resolver;
 
+mod detect;
 mod env;
