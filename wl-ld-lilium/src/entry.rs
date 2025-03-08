@@ -1,8 +1,10 @@
 use alloc::borrow::ToOwned;
 use lccc_siphash::{RawSipHasher, SipHashState};
 use ld_so_impl::loader::Error;
-use linux_raw_sys::general::{MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE};
-use linux_syscall::{Result as _, SYS_mmap, SYS_openat, Syscall, syscall};
+use linux_raw_sys::general::{
+    MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
+};
+use linux_syscall::{Result as _, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
 use wl_interface_map::wl_setup_process_name;
 
 use core::ffi::{CStr, c_char, c_ulong, c_void};
@@ -15,7 +17,7 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
 use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_rdonly};
-use crate::loader::{LOADER, set_tp};
+use crate::loader::{LOADER, Tcb, set_tp};
 use crate::rand::Gen;
 use crate::{env::__ENV, resolver};
 
@@ -24,6 +26,8 @@ use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
 const USAGE_TAIL: &str = "[OPTION]... <binary file> [args...]";
 
 const ARCH: &str = core::env!("ARCH");
+
+const MMAP_REGION_SIZE: usize = 4096 * 256;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
@@ -55,9 +59,9 @@ unsafe extern "C" fn __rust_entry(
     let native_region_base = end_addr.wrapping_sub(NATIVE_REGION_SIZE);
 
     unsafe {
-        __MMAP_ADDR
-            .as_ptr()
-            .write(SyncPointer(base_addr.add(NATIVE_REGION_SIZE)))
+        __MMAP_ADDR.as_ptr().write(SyncPointer(
+            native_region_base.cast_mut().wrapping_sub(MMAP_REGION_SIZE),
+        ))
     }
 
     LOADER.native_base.store(
@@ -124,7 +128,8 @@ unsafe extern "C" fn __rust_entry(
 
     let mut rand = Gen::seed(rand);
 
-    let lilium_base_addr = core::ptr::without_provenance_mut((rand.next() as usize) & SLIDE_MASK);
+    let lilium_base_addr =
+        core::ptr::without_provenance_mut(((rand.next() as usize) & SLIDE_MASK) + (4096 * 4096));
 
     LOADER
         .winter_base
@@ -219,13 +224,22 @@ unsafe extern "C" fn __rust_entry(
         }
     }
 
+    let tls_block_ptr = unsafe {
+        native_region_base
+            .cast_mut()
+            .wrapping_sub(MMAP_REGION_SIZE)
+            .wrapping_sub(TLS_BLOCK_SIZE)
+    };
+
     let init_tls_block = unsafe {
         syscall!(
             SYS_mmap,
-            core::ptr::null_mut::<c_void>(),
+            tls_block_ptr,
             TLS_BLOCK_SIZE,
             PROT_NONE,
-            MAP_PRIVATE | MAP_ANONYMOUS
+            MAP_PRIVATE | MAP_ANONYMOUS,
+            -1,
+            0
         )
     };
 
@@ -236,7 +250,22 @@ unsafe extern "C" fn __rust_entry(
     let init_tls_block =
         core::ptr::with_exposed_provenance_mut::<c_void>(init_tls_block.as_usize_unchecked());
 
-    set_tp(init_tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1));
+    let tp = init_tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1);
+
+    let res = unsafe {
+        syscall!(
+            SYS_mprotect,
+            tp,
+            core::mem::size_of::<Tcb>(),
+            PROT_READ | PROT_WRITE
+        )
+    };
+
+    if res.check().is_err() {
+        crash_unrecoverably();
+    }
+
+    set_tp(tp);
 
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };

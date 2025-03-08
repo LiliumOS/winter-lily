@@ -254,16 +254,24 @@ impl LoaderImpl for FdLoader {
     }
 }
 
+#[repr(C)]
+pub struct Tcb {
+    tls_base: *mut c_void,
+}
+
 pub static LOADER: FdLoader = FdLoader {
     native_base: AtomicPtr::new(core::ptr::null_mut()),
     winter_base: AtomicPtr::new(core::ptr::null_mut()),
-    tls_off: AtomicUsize::new(0),
+    tls_off: AtomicUsize::new(core::mem::size_of::<Tcb>()),
 };
 
 pub fn set_tp(ptr: *mut c_void) {
+    unsafe {
+        ptr.cast::<Tcb>().write(Tcb { tls_base: ptr });
+    }
     cfg_match::cfg_match! {
         target_arch = "x86_64" => if is_x86_feature_detected!("fsgsbase"){
-            unsafe { core::arch::asm!("wrfsbase {ptr}", ptr = in(reg) ptr, options(preserves_flags))}
+            unsafe { core::arch::asm!("wrfsbase {ptr}", ptr = in(reg) ptr, options(preserves_flags, nostack))}
         } else {
             unsafe { let _ = syscall!(SYS_arch_prctl, ARCH_SET_FS, ptr.expose_provenance());}
         },
@@ -275,7 +283,7 @@ pub fn get_tp() -> *mut c_void {
     let val: *mut c_void;
     cfg_match::cfg_match! {
         target_arch = "x86_64" =>
-            unsafe { core::arch::asm!("lea {val}, fs:[0]", val = out(reg) val, options(readonly, pure, preserves_flags))}
+            unsafe { core::arch::asm!("mov {val}, fs:[{val}]", val = inout(reg) 0usize => val, options(readonly, pure, preserves_flags, nostack))}
         ,
     }
     val

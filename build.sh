@@ -16,21 +16,22 @@ echo "syslibdir=$PREFIX/lib" >> musl/config.mak
 echo "LIBCC=-static-libgcc --rtlib=compiler-rt --unwindlib=libunwind" >> musl/config.mak
 echo "CC=clang" >> musl/config.mak
 
-NPROC="$(nproc)"
+NPROC=$(("$(nproc)"*2))
 
 echo "Building: musl"
 make -C musl all -j${NPROC}  && make -C musl install -j${NPROC} || exit $?
 
 build_autotools(){
+    prg="$1"
     echo "Building: $1"
     mkdir -p "$CARGO_TARGET_DIR"
     BUILD_DIR="$CARGO_TARGET_DIR/$1-${TARGET_RUST}"
     SRC_DIR="$(pwd)/$2"
     shift 2
 
-    if mkdir "$BUILD_DIR"
+    if mkdir "$BUILD_DIR" 2> /dev/null || [ "$REBUILD_TOOL" = "$prg" -o "$REBUILD_TOOL" = "all" ]
     then
-        (cd "$BUILD_DIR" && PATH="$PREFIX/bin:$PATH" "$SRC_DIR/configure" --target "${TARGET_RUST}" --prefix "$PREFIX" --exec-prefix "$PREFIX" "$@") && make -C "$BUILD_DIR" -j"$NPROC" && make -C "$BUILD_DIR" -s install
+        (cd "$BUILD_DIR" && PATH="$PREFIX/bin:$PATH" "$SRC_DIR/configure" --target "${TARGET_RUST}" --prefix "$PREFIX" --exec-prefix "$PREFIX" "$@") && [ "$PREREQS_NO_BUILD" = "$prg" ] || ( make -C "$BUILD_DIR" -j"$NPROC" && make -C "$BUILD_DIR" -s install )
     else
         true
     fi
