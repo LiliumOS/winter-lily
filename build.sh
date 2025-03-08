@@ -45,11 +45,13 @@ ln -sf $PREFIX/$RUST_TARGET/lib64/libgcc_s.so $PREFIX/lib/libgcc_s.so
 
 if [ "$STAGE" != "prereqs" ]
 then
+
+echo "Building ld-lilium-$ARCH.so"
+(cd wl-ld-lilium && cargo build -Z build-std="core,alloc" --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_LD") || exit $?
+
 echo "Building: wl host libraries"
 PATH="$PREFIX/bin:$PATH" REALGCC="$TARGET_RUST-gcc" RUSTFLAGS="-Ctarget-feature=-crt-static -L native=$PREFIX/lib -L native=$PREFIX/$TARGET_RUST/lib -L native=$PREFIX/$TARGET_RUST/lib64 -C link-arg=-static-libgcc -Clinker=musl-gcc -Clinker-flavor=gcc" cargo build -Z build-std="core,alloc,std" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
 
-echo "Building ld-lilium-$ARCH.so"
-(cd wl-ld-lilium && cargo build -Z build-std="core,alloc" --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_LD")
 
 mkdir -p $PREFIX/etc
 
