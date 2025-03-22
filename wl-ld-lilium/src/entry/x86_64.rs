@@ -5,6 +5,8 @@ use super::*;
 core::arch::global_asm! {
     ".globl _start",
     ".hidden _start",
+    ".type _start, STT_FUNC",
+    ".size _start, _start._end - _start",
     "_start:",
     "pop r12",
     "xor rbp, rbp",
@@ -40,6 +42,7 @@ core::arch::global_asm! {
     "mov eax, 60",
     "syscall",
     "ud2",
+    "_start._end:",
     rust_entry = sym __rust_entry,
     STACK_DISPLACEMENT = const STACK_DISPLACEMENT,
     STACK_SIZE = const STACK_SIZE,

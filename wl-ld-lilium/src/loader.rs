@@ -83,6 +83,7 @@ impl LoaderImpl for FdLoader {
         for phdr in phdr {
             let mut addr = base_addr.wrapping_offset(phdr.p_paddr as isize);
             let mut len = phdr.p_memsz as usize;
+            let mut file_len = phdr.p_filesz as usize;
 
             let mut perms = linux_raw_sys::general::PROT_READ;
 
@@ -104,13 +105,14 @@ impl LoaderImpl for FdLoader {
                     )
                 };
                 res.check().map_err(|_| Error::LoadError)?;
-                let size = addr.align_offset(4096).min(phdr.p_filesz as usize);
+                let size = addr.align_offset(4096).min(file_len);
                 let ptr = unsafe { core::slice::from_raw_parts_mut(addr.cast::<u8>(), size) };
                 self.read_offset(phdr.p_offset, map_desc, ptr)?;
 
                 let res = unsafe { syscall!(SYS_mprotect, last_pg_addr, 4096, perms | last_perms) };
                 res.check().map_err(|_| Error::LoadError)?;
                 len = len.saturating_sub(4096);
+                file_len = file_len.saturating_sub(4096);
                 addr = addr.map_addr(|v| (v + 4095) & !4095);
             }
 
@@ -122,7 +124,7 @@ impl LoaderImpl for FdLoader {
                     syscall!(
                         SYS_mmap,
                         addr.map_addr(|v| v & !4095),
-                        len,
+                        file_len,
                         perms,
                         linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_FIXED,
                         map_desc.addr() as i32,
