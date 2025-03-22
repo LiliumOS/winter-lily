@@ -76,6 +76,7 @@ unsafe extern "C" fn __rust_entry(
 
     let mut execfd = -1;
 
+    unsafe { (&mut *RESOLVER.as_ptr()).force_resolve_now() }; // For now, config based off `LD_BIND_NOW` later 
     unsafe { (&mut *RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
@@ -267,6 +268,7 @@ unsafe extern "C" fn __rust_entry(
 
     set_tp(tp);
 
+    unsafe { (&mut *WL_RESOLVER.as_ptr()).force_resolve_now() };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
