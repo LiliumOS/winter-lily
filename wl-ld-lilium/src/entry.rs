@@ -272,6 +272,9 @@ unsafe extern "C" fn __rust_entry(
 
     let base = ldso::load_subsystem("base", c"libusi-base.so");
 
+    eprintln!("Entries:");
+    eprintln!("{:#?}", RESOLVER.live_entries());
+
     let sym = RESOLVER.find_sym(wl_setup_process_name!(C));
 
     eprintln!("Found __wl_impl_setup_process: {:p}", sym);
