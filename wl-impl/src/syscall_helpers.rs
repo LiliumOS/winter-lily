@@ -7,7 +7,7 @@ pub type SysCallTyErased = unsafe extern "sysv64" fn(core::convert::Infallible);
 #[macro_export]
 #[cfg(target_arch = "x86_64")]
 macro_rules! export_syscall {
-    (unsafe extern fn $name:ident ($($params:ident : $param_ty:ty),* , $va_name:ident: ...) -> $ret_ty:ty $body:block) => {
+    (unsafe extern fn $name:ident ($(|$ctx:pat_param|)? $($params:ident : $param_ty:ty),* , $va_name:ident: ...) -> $ret_ty:ty $body:block) => {
         #[unsafe(no_mangle)]
         #[allow(unreachable_code)]
         pub unsafe extern "sysv64" fn $name ($($params: $param_ty),*, $va_name: ...) -> <$ret_ty as $crate::syscall_helpers::SyscallRet>::Sys {
@@ -16,7 +16,7 @@ macro_rules! export_syscall {
             $crate::syscall_helpers::SyscallRet::into_sys(ret_val)
         }
     };
-    (unsafe extern fn $name:ident ($($params:ident : $param_ty:ty),* $(,)?) -> $ret_ty:ty $body:block) => {
+    (unsafe extern fn $name:ident ($(|$ctx:pat_param|)? $($params:ident : $param_ty:ty),* $(,)?) -> $ret_ty:ty $body:block) => {
         #[unsafe(no_mangle)]
         #[allow(unreachable_code)]
         pub unsafe extern "sysv64" fn $name ($($params: $param_ty),*) -> <$ret_ty as $crate::syscall_helpers::SyscallRet>::Sys {

@@ -373,7 +373,8 @@ impl<T> OnceLock<T> {
 
 pub use ld_so_impl::helpers::*;
 use linux_syscall::{
-    SYS_close, SYS_getdents64, SYS_mmap, SYS_mremap, SYS_munmap, SYS_openat, SYS_write, syscall,
+    SYS_close, SYS_getdents64, SYS_mmap, SYS_mremap, SYS_munmap, SYS_open, SYS_openat, SYS_write,
+    syscall,
 };
 
 pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut [T] {
@@ -389,6 +390,8 @@ pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut 
 
 use core::ffi::c_void;
 use linux_syscall::Result as _;
+
+use crate::env::get_cenv;
 
 pub struct NoGlobalAlloc;
 
@@ -742,10 +745,33 @@ pub fn debug(src: &str, buf: &[u8]) {
     }
 }
 
-pub fn open_rdonly(at_fd: i32, st: &str) -> crate::io::Result<i32> {
+static SYSROOT_FD: OnceLock<i32> = OnceLock::new();
+
+pub fn open_sysroot_rdonly(mut at_fd: i32, st: &str) -> crate::io::Result<i32> {
     debug("open_rdonly", st.as_bytes());
     let mut path = safe_zeroed::<[u8; 256]>();
     copy_to_slice_head(&mut path, st.as_bytes())[0] = 0;
+
+    let mut path = &path[..];
+    if path[0] == b'/' {
+        path = &path[1..];
+        at_fd = *(SYSROOT_FD.get_or_try_init(|| {
+            let sysroot = get_cenv("WL_SYSROOT").unwrap_or(c"/");
+
+            let ptr = sysroot.as_ptr();
+
+            let fd = unsafe {
+                syscall!(
+                    SYS_open,
+                    ptr,
+                    linux_raw_sys::general::O_RDONLY | linux_raw_sys::general::O_DIRECTORY
+                )
+            };
+            fd.check()?;
+
+            Ok(fd.as_usize_unchecked() as i32)
+        })?);
+    }
     let fd = unsafe {
         syscall!(
             SYS_openat,
@@ -756,7 +782,7 @@ pub fn open_rdonly(at_fd: i32, st: &str) -> crate::io::Result<i32> {
     };
     fd.check()?;
 
-    Ok(fd.as_u64_unchecked() as i32)
+    Ok(fd.as_usize_unchecked() as i32)
 }
 
 #[repr(C)]
@@ -796,7 +822,7 @@ pub fn expand_glob(
     debug("expand_glob(prefix)", prefix.as_bytes());
     debug("expand_glob(suffix)", suffix.as_bytes());
 
-    let fd = open_rdonly(linux_raw_sys::general::AT_FDCWD, dir)?;
+    let fd = open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, dir)?;
 
     let mut buf = unsafe {
         Box::<MaybeUninit<[u8; 4096]>, _>::assume_init(Box::<[u8; 4096], _>::new_zeroed_in(

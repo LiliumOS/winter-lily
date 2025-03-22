@@ -16,7 +16,7 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
-use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_rdonly};
+use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly};
 use crate::loader::{LOADER, Tcb, set_tp};
 use crate::rand::Gen;
 use crate::{env::__ENV, resolver};

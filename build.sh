@@ -41,7 +41,7 @@ build_autotools(){
 build_autotools binutils binutils-gdb --disable-gdb || exit $?
 build_autotools gcc gcc --with-build-sysroot="$PREFIX" --with-headers="$PREFIX/include" --disable-multilib --disable-bootstrap --enable-languages=c --enable-shared --disable-libvtv --disable-libssp --disable-libquadmath --disable-libsanitizer --disable-libgomp --disable-libatomic  || exit $?
 
-ln -sf $PREFIX/$RUST_TARGET/lib64/libgcc_s.so $PREFIX/lib/libgcc_s.so
+ln -sf $PREFIX/$TARGET_RUST/lib64/libgcc_s.so $PREFIX/lib/libgcc_s.so
 
 if [ "$STAGE" != "prereqs" ]
 then
@@ -50,8 +50,7 @@ echo "Building ld-lilium-$ARCH.so"
 (cd wl-ld-lilium && cargo build -Z build-std="core,alloc" --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_LD") || exit $?
 
 echo "Building: wl host libraries"
-PATH="$PREFIX/bin:$PATH" REALGCC="$TARGET_RUST-gcc" RUSTFLAGS="-Ctarget-feature=-crt-static -L native=$PREFIX/lib -L native=$PREFIX/$TARGET_RUST/lib -L native=$PREFIX/$TARGET_RUST/lib64 -C link-arg=-static-libgcc -Clinker=musl-gcc -Clinker-flavor=gcc" cargo build -Z build-std="core,alloc,std" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
-
+PATH="$PREFIX/bin:$PATH" REALGCC="$TARGET_RUST-gcc" RUSTFLAGS="-Ctarget-feature=-crt-static -L native=$PREFIX/lib -L native=$PREFIX/$TARGET_RUST/lib -L native=$PREFIX/$TARGET_RUST/lib64 -C link-arg=-static-libgcc -Clinker=musl-gcc -Clinker-flavor=gcc" cargo build -Z build-std="core,alloc,std"  --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
 
 mkdir -p $PREFIX/etc
 

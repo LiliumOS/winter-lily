@@ -10,7 +10,7 @@ fi
 
 IFS="-" read -r ARCH _REST <<< "$TARGET"
 
-case "$_RUST" in
+case "$_REST" in
    *-*-*)
       IFS="-" read -r VENDOR OS SYS <<< "$VENDOR"
       ;;

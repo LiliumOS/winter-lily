@@ -1,0 +1,1 @@
+INPUT(%host_libdir%/libwl-usi-%usilib%.so)

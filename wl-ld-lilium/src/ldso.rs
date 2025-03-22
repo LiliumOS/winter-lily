@@ -30,7 +30,7 @@ pub static __MMAP_ADDR: FusedUnsafeCell<SyncPointer<*mut c_void>> =
 pub static __LDSO_HOST_SEARCH_LIST: OnceLock<&str> = OnceLock::new();
 pub static __LDSO_LILIUM_SEARCH_LIST: OnceLock<&str> = OnceLock::new();
 
-use crate::helpers::{expand_glob, open_rdonly};
+use crate::helpers::{expand_glob, open_sysroot_rdonly};
 
 fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Result<()> {
     let mut v = safe_zeroed::<[u8; 256]>();
@@ -51,12 +51,12 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Res
         }
 
         if let Some(path) = st.strip_prefix("include ") {
-            match open_rdonly(linux_raw_sys::general::AT_FDCWD, path) {
+            match open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, path) {
                 Ok(fd) => read_config_file(fd, buf)?,
                 Err(e) => {
                     if SplitAscii::new(path, b'*').find().is_some() {
                         expand_glob(path, |dirfd, path| {
-                            let fd = open_rdonly(dirfd, unsafe {
+                            let fd = open_sysroot_rdonly(dirfd, unsafe {
                                 core::str::from_utf8_unchecked(path.to_bytes())
                             })?;
 
@@ -93,7 +93,7 @@ fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'sta
         buf.resize(pos + v.len() + 1, 0x1E);
         copy_to_slice_head(&mut buf[pos..], v.as_bytes());
     }
-    if let Ok(fd) = open_rdonly(linux_raw_sys::general::AT_FDCWD, config_path) {
+    if let Ok(fd) = open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, config_path) {
         read_config_file(fd, &mut buf)?;
     }
 
@@ -212,7 +212,7 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
 
     let fhdl = if let Some(var) = env::get_env(env_name) {
         if var.contains('/') {
-            let fd = open_rdonly(AT_FDCWD, var)
+            let fd = open_sysroot_rdonly(AT_FDCWD, var)
                 .unwrap_or_else(|_| RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound));
 
             core::ptr::without_provenance_mut(fd as usize)
