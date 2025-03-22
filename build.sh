@@ -7,6 +7,9 @@ CARGOFLAGS=
 if [ "$RELEASE" != "" ]
 then
     CARGOFLAGS="--release"
+    CFLAGS_MUSL="-O3"
+else 
+    CFLAGS_MUSL="-O2 -g"
 fi
 
 echo "ARCH=$ARCH" > musl/config.mak
@@ -15,6 +18,7 @@ echo "exec_prefix=$PREFIX" >> musl/config.mak
 echo "syslibdir=$PREFIX/lib" >> musl/config.mak
 echo "LIBCC=-static-libgcc --rtlib=compiler-rt --unwindlib=libunwind" >> musl/config.mak
 echo "CC=clang" >> musl/config.mak
+echo "CFLAGS=$CFLAGS_MUSL" >> musl/config.mak
 
 NPROC=$(("$(nproc)"*2))
 
