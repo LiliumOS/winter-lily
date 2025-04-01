@@ -4,15 +4,31 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-indexmap = "2.7.1"
+indexmap = { version = "2.7.1", default-features = false }
 lilium-sys.workspace = true
 bytemuck.workspace = true
-libc.workspace = true
-memchr = "2.7.4"
+linux-raw-sys.workspace = true
+memchr = { version = "2.7.4", default-features = false }
 linux-syscall.workspace = true
+linux-errno.workspace = true
 git-version = "0.3.9"
-dashmap = "6.1.0"
 wl-interface-map = { path = "../wl-interface-map" }
+wl-helpers.workspace = true
+hashbrown = { version = "0.15.2", default-features = false, features = [
+    "allocator-api2",
+    "inline-more",
+    "equivalent",
+    "nightly",
+] }
+lccc-siphash = { git = "https://github.com/lccc-project/lccc-siphash.git", version = "0.1.0" }
+allocator-api2 = { version = "0.2.21", default-features = false, features = [
+    "alloc",
+    "nightly",
+] }
+paste = "1.0.15"
+rustix.workspace = true
+lock_api = "0.4.12"
+pooled-arena-malloc.workspace = true
 
 [lib]
 crate-type = ["dylib"]

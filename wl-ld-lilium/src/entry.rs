@@ -32,6 +32,11 @@ const MMAP_REGION_SIZE: usize = 4096 * 256;
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 
+static __AUXV: FusedUnsafeCell<Option<&[AuxEnt]>> = FusedUnsafeCell::new(None);
+
+static NATIVE_REGION_BASE: FusedUnsafeCell<SyncPointer<*const c_void>> =
+    FusedUnsafeCell::new(SyncPointer::null());
+
 unsafe extern "C" fn __rust_entry(
     argc: i32,
     mut argv: *mut *mut c_char,
@@ -71,6 +76,10 @@ unsafe extern "C" fn __rust_entry(
 
     let auxv =
         unsafe { NullTerm::<AuxEnt, usize>::from_ptr_unchecked(NonNull::new_unchecked(auxv)) };
+
+    let auxv = auxv.as_slice();
+
+    unsafe { (*__AUXV.as_ptr()) = Some(auxv) };
 
     let mut rand = [0u8; 16];
 
@@ -268,6 +277,47 @@ unsafe extern "C" fn __rust_entry(
 
     set_tp(tp);
 
+    let libc = unsafe {
+        RESOLVER.load(
+            c"libc.so",
+            core::ptr::without_provenance_mut(SearchType::Host as usize),
+        )
+    };
+
+    let libc_start_main = RESOLVER.find_sym_in(c"__libc_start_main", libc);
+
+    eprintln!("Found __libc_start_main: {:p}", libc_start_main);
+
+    unsafe { (*NATIVE_REGION_BASE.as_ptr()).0 = native_region_base };
+
+    let libc_start_main: unsafe extern "C" fn(
+        main: unsafe extern "C" fn(i32, *mut *mut c_char, *mut *mut c_char) -> i32,
+        argc: i32,
+        argv: *mut *mut c_char,
+        init: unsafe extern "C" fn(),
+        fini: unsafe extern "C" fn(),
+        rtld_fini: unsafe extern "C" fn(),
+        stack_end: *mut c_void,
+    ) -> i32 = unsafe { core::mem::transmute(libc_start_main) };
+
+    unsafe {
+        libc_start_main(
+            main,
+            argc,
+            argv,
+            __dummy_init,
+            __dummy_fini,
+            __dummy_fini,
+            stack_addr.wrapping_add(STACK_SIZE),
+        )
+    }
+}
+
+unsafe extern "C" fn __dummy_init() {}
+
+unsafe extern "C" fn __dummy_fini() {}
+
+extern "C" fn main(argc: i32, argv: *mut *mut c_char, envp: *mut *mut c_char) -> i32 {
     unsafe { (&mut *WL_RESOLVER.as_ptr()).force_resolve_now() };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
@@ -285,7 +335,7 @@ unsafe extern "C" fn __rust_entry(
 
     unsafe {
         setup_process(
-            native_region_base.cast_mut().cast(),
+            NATIVE_REGION_BASE.0.cast_mut().cast(),
             NATIVE_REGION_SIZE,
             wl_interface_map::FilterMode::Prctl,
         )
@@ -340,4 +390,4 @@ fn resolve_error(c: &core::ffi::CStr, e: Error) -> ! {
     unsafe { core::arch::asm!("ud2", options(noreturn)) }
 }
 
-use crate::ldso::{self, __MMAP_ADDR};
+use crate::ldso::{self, __MMAP_ADDR, SearchType};

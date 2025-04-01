@@ -1,0 +1,11 @@
+[package]
+name = "wl-helpers"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+linux-raw-sys = { version = "0.9.3", default-features = false, features = [
+    "general",
+    "no_std",
+] }
+linux-syscall = "1.0.0"

@@ -7,5 +7,6 @@
         "wl-ld-lilium/Cargo.toml",
         "wl-ld-lilium/ld-so-impl/Cargo.toml",
         "wl-interface-map/Cargo.toml"
-    ]
+    ],
+    "cmake.sourceDirectory": "/home/chorm/winter-lily/binutils-gdb/zlib"
 }

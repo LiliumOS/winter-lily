@@ -1,3 +1,4 @@
+#![no_std]
 use wl_impl::{
     helpers::insert_elems, syscall_handler::register_subsys, syscall_helpers::SysCallTyErased,
     wl_init_subsystem_name,

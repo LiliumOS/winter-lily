@@ -39,6 +39,7 @@ rustix = { version = "0.38.44", default-features = false, features = [
     "linux_4_11",
 ] }
 wl-interface-map = { path = "../wl-interface-map" }
+wl-helpers = { path = "../wl-helpers" }
 lccc-siphash = { git = "https://github.com/lccc-project/lccc-siphash.git", version = "0.1.0" }
 cfg-match = "0.2.1"
 

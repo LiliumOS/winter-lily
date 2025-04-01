@@ -10,3 +10,6 @@
 [submodule "binutils-gdb"]
 	path = binutils-gdb
 	url = https://github.com/bminor/binutils-gdb.git
+[submodule "pooled-alloc"]
+	path = pooled-alloc
+	url = https://github.com/LiliumOS/pooled-alloc.git

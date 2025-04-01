@@ -1,6 +1,12 @@
 [workspace]
-members = ["wl-impl", "wl-usi-base", "wl-usi-io"]
-exclude = ["wl-ld-lilium", "wl-interface-map"]
+members = [
+    "wl-helpers",
+    "wl-impl",
+    "wl-usi-base",
+    "wl-usi-io",
+    "wl-ld-lilium",
+    "wl-interface-map",
+]
 resolver = "3"
 
 [workspace.package]
@@ -9,7 +15,6 @@ version = "0.1.0"
 
 [workspace.dependencies]
 lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-features = false, features = [
-    "std",
     "error-enum",
     "bytemuck",
     "core-subsys",
@@ -17,6 +22,46 @@ lilium-sys = { git = "https://github.com/LiliumOS/lilium-sys.git", default-featu
 ] }
 bytemuck = { version = "1.21.0", features = ["latest_stable_rust"] }
 wl-impl = { path = "wl-impl", version = "0.1.0" }
+wl-helpers = { path = "wl-helpers" }
 linux-syscall = "1.0.0"
 cfg-match = "0.2.1"
-libc = "0.2.169"
+linux-errno = "1.0.1"
+linux-raw-sys = { version = "0.9.3", default-features = false, features = [
+    "general",
+    "no_std",
+    "prctl",
+] }
+rustix = { version = "1.0.3", default-features = false, features = [
+    "event",
+    "fs",
+    "io_uring",
+    "mm",
+    "mount",
+    "net",
+    "param",
+    "pipe",
+    "process",
+    "pty",
+    "rand",
+    "runtime",
+    "shm",
+    "stdio",
+    "system",
+    "termios",
+    "thread",
+    "time",
+    "linux_5_11",
+] }
+pooled-arena-malloc = { path = "pooled-alloc" }
+
+[profile.dev.package.'wl-ld-lilium']
+opt-level = 1
+debug = 2
+overflow-checks = false
+debug-assertions = false
+
+[profile.dev.package.'ld-so-impl']
+opt-level = 1
+debug = 2
+overflow-checks = false
+debug-assertions = false

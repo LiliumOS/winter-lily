@@ -1,4 +1,6 @@
-use std::{cell::UnsafeCell, num::NonZero, sync::Arc};
+use core::{cell::UnsafeCell, num::NonZero};
+
+use alloc::sync::Arc;
 
 use indexmap::IndexSet;
 use lilium_sys::{

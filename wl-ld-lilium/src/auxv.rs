@@ -6,3 +6,4 @@ pub struct AuxEnt {
     pub at_tag: usize,
     pub at_val: *mut c_void,
 }
+unsafe impl Sync for AuxEnt {}

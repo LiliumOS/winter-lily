@@ -23,7 +23,7 @@ esac
 echo "$ARCH"
 
 TARGET_LD="$ARCH-unknown-linux-none"
-TARGET_RUST="$ARCH-unknown-linux-musl"
+TARGET_RUST="$ARCH-unknown-linux-none"
 
 
 CARGO_TARGET_DIR="$(pwd)/target"

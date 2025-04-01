@@ -1,26 +1,24 @@
-use std::os::raw::c_void;
+use core::ffi::c_void;
 
-use libc::{mcontext_t, siginfo_t, ucontext_t};
+use linux_raw_sys::general::siginfo_t;
 
-use std::arch::naked_asm;
+use core::arch::naked_asm;
 
 use crate::syscall_handler::__handle_syscall;
 
 #[unsafe(no_mangle)]
-unsafe extern "C" fn __sa_handler_seh_impl(signo: i32, siginfo: *mut siginfo_t, uctx: *mut c_void) {
-    if signo == libc::SIGSYS
-        && (unsafe { (*siginfo).si_code } == 1 || unsafe { (*siginfo).si_code } == 2)
+unsafe extern "C" fn __sa_handler_seh_impl(signo: u32, siginfo: *mut siginfo_t, uctx: *mut c_void) {
+    if signo == linux_raw_sys::general::SIGSYS
+        && (unsafe { (*siginfo).__bindgen_anon_1.__bindgen_anon_1.si_code } == 1
+            || unsafe { (*siginfo).__bindgen_anon_1.__bindgen_anon_1.si_code } == 2)
     {
-        let uctx = uctx.cast::<ucontext_t>();
-        unsafe { invoke_syscall_uctx(&raw const (*uctx).uc_mcontext) }
+        todo!()
     }
 }
 
 #[cfg(target_arch = "x86_64")]
 #[naked]
-unsafe extern "C" fn invoke_syscall_uctx(uctx: *const mcontext_t) {
-    use libc::{REG_R8, REG_R9, REG_R10, REG_RAX, REG_RDI, REG_RDX, REG_RSI};
-
+unsafe extern "C" fn invoke_syscall_uctx(uctx: *const c_void) {
     unsafe {
         naked_asm! {
             "push rbx",
@@ -37,13 +35,13 @@ unsafe extern "C" fn invoke_syscall_uctx(uctx: *const mcontext_t) {
             "mov qword ptr [rbx+8*{RAX}], rax",
             "pop rbx",
             "ret",
-            RAX = const REG_RAX,
-            RDI = const REG_RDI,
-            RSI = const REG_RSI,
-            RDX = const REG_RDX,
-            R10 = const REG_R10,
-            R8 = const REG_R8,
-            R9 = const REG_R9,
+            RAX = const 0,
+            RDI = const 1,
+            RSI = const 2,
+            RDX = const 3,
+            R10 = const 4,
+            R8 = const 5,
+            R9 = const 6,
             handle_syscall = sym __handle_syscall
         }
     }

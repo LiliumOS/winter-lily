@@ -290,6 +290,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "wl-helpers"
+version = "0.1.0"
+
+[[package]]
 name = "wl-interface-map"
 version = "0.1.0"
 
@@ -307,5 +311,6 @@ dependencies = [
  "linux-raw-sys 0.8.0",
  "linux-syscall",
  "rustix",
+ "wl-helpers",
  "wl-interface-map",
 ]

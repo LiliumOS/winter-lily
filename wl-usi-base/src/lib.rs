@@ -1,4 +1,5 @@
 #![feature(never_type)]
+#![no_std]
 use lilium_sys::sys::sysno::base::SYS_UnmanagedException;
 use wl_impl::{
     erase, helpers::insert_elems, syscall_handler::register_subsys,

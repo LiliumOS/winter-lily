@@ -11,6 +11,10 @@
     allocator_api,
     alloc_layout_extra
 )]
+#![no_std]
+
+extern crate alloc;
+
 use core::sync::atomic::AtomicI8;
 
 pub mod env;
@@ -22,7 +26,11 @@ pub mod catch_signals;
 
 pub mod syscall_handler;
 
-pub mod alloc;
+pub mod global;
+
+pub mod ministd;
+
+pub mod libc;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");
@@ -89,3 +97,5 @@ pub mod consts {
     pub const KAPI_VERSION: u64 =
         ((VERSION_MAJOR as u64) << 40) | ((VERSION_MINOR as u64) << 20) | (VERSION_PATCH as u64);
 }
+
+mod panic;

@@ -1,6 +1,11 @@
-use std::collections::HashMap;
+use crate::ministd::HashMap;
 
 use memchr::memchr;
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 const KEY_TERM: u8 = 0xFE;
 const ENTRY_TERM: u8 = 0xFF;
@@ -83,21 +88,6 @@ impl<K: AsRef<str>, V: AsRef<str>> Extend<(K, V)> for EnvMap {
 }
 
 impl EnvMap {
-    pub fn from_posix_env() -> Self {
-        std::env::vars().collect()
-    }
-
-    pub fn from_posix_env_lossy() -> Self {
-        std::env::vars_os()
-            .map(|(k, v)| {
-                (
-                    String::from_utf8_lossy_owned(k.into_encoded_bytes()),
-                    String::from_utf8_lossy_owned(v.into_encoded_bytes()),
-                )
-            })
-            .collect()
-    }
-
     pub fn iter(&self) -> Iter {
         Iter(&self.env)
     }

@@ -1,7 +1,3 @@
-use lilium_sys::result::Error;
-use lilium_sys::result::Result;
-use std::sync::atomic::Ordering;
-
 use crate::helpers::CheckedAccessError;
 
 unsafe extern "C" {

@@ -1,11 +1,10 @@
 use core::ops::Range;
-use std::{
+use core::{
     array::from_fn, cell::UnsafeCell, cmp::Ordering, ffi::c_void, iter::FusedIterator,
     marker::PhantomData, mem::MaybeUninit, num::NonZero, ptr::NonNull, sync::atomic::AtomicUsize,
 };
 
 use bytemuck::{NoUninit, Zeroable};
-use libc::{sigaction, sigset_t};
 use lilium_sys::{
     result::{Error as SysError, Result as SysResult},
     sys::{
@@ -13,6 +12,8 @@ use lilium_sys::{
         option::ExtendedOptionHead,
     },
 };
+use linux_raw_sys::general::{SIGKILL, SIGQUIT, sigaction, sigset_t};
+use linux_syscall::{SYS_getpid, SYS_kill, SYS_rt_sigaction, syscall};
 
 mod rt_impls;
 
@@ -265,22 +266,26 @@ pub const fn insert_elems<T: Copy, const N: usize, const R: usize>(
 }
 
 pub fn exit_unrecoverably() -> ! {
+    let pid = unsafe { syscall!(SYS_getpid).as_u64_unchecked() };
     unsafe {
-        libc::sigaction(
-            libc::SIGQUIT,
+        syscall!(
+            SYS_rt_sigaction,
+            SIGQUIT,
             &sigaction {
-                sa_sigaction: libc::SIG_DFL,
+                sa_handler: linux_raw_sys::signal_macros::SIG_DFL,
                 sa_mask: core::mem::zeroed(),
                 sa_flags: 0,
                 sa_restorer: None,
             },
-            core::ptr::null_mut(),
+            core::ptr::null_mut::<sigaction>(),
+            core::mem::size_of::<linux_raw_sys::general::sigset_t>()
         );
-        libc::raise(libc::SIGQUIT);
+
+        syscall!(SYS_kill, pid, SIGQUIT);
     }
     loop {
         unsafe {
-            libc::raise(9);
+            syscall!(SYS_kill, pid, SIGKILL);
         } // Support dumping core later
     }
 }

@@ -1,5 +1,5 @@
+use core::sync::atomic::{AtomicUsize, Ordering};
 use core::{arch::global_asm, ffi::c_void, sync::atomic::AtomicPtr};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::syscall_helpers::SysCallTyErased;
 use core::convert::Infallible;

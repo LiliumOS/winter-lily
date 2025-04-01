@@ -6,7 +6,7 @@ use lilium_sys::{
 use wl_impl::{consts, export_syscall, helpers::*};
 
 use lilium_sys::result::Result;
-use std::sync::LazyLock;
+use wl_helpers::LazyLock;
 
 const BASE: uuid::Uuid = uuid::uuid!("bf5db4a1-fd7d-5785-822a-d18ea774625d");
 
