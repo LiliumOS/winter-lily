@@ -8,5 +8,10 @@
         "wl-ld-lilium/ld-so-impl/Cargo.toml",
         "wl-interface-map/Cargo.toml"
     ],
-    "cmake.sourceDirectory": "/home/chorm/winter-lily/binutils-gdb/zlib"
+    "cmake.sourceDirectory": "/home/chorm/winter-lily/binutils-gdb/zlib",
+    "files.associations": {
+        "setjmp.h": "c",
+        "signal.h": "c",
+        "siginfo.h": "c"
+    }
 }

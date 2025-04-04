@@ -1,3 +1,4 @@
+use lilium_sys::misc::MaybeValid;
 pub use linux_raw_sys::general::*;
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -73,4 +74,14 @@ impl<T> FromSysVal for *const T {
 
 impl FromSysVal for () {
     unsafe fn from_raw(_: usize) -> Self {}
+}
+
+mod libc_defs;
+
+pub use libc_defs::*;
+
+pub fn siginfo(
+    info_handler: unsafe extern "C" fn(signo: c_int, info: *const siginfo_t, ucontext: *mut c_void),
+) -> MaybeValid<unsafe extern "C" fn(signo: c_int)> {
+    unsafe { core::mem::transmute(info_handler) }
 }

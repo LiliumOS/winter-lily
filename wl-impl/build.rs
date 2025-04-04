@@ -76,5 +76,8 @@ fn main() {
         .std("c17")
         .pic(true)
         .cargo_metadata(true)
+        .flag_if_supported("-ffreestanding")
+        .include("c/signal_support/include")
+        .include(format!("c/signal_support/include/{arch}/"))
         .compile("signal_support");
 }

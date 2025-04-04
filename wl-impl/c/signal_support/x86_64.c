@@ -1,11 +1,12 @@
 #define _POSIX_C_SOURCE 200112L
 
-#include <setjmp.h>
 #include <stddef.h>
 #include <signal.h>
 #include <stdatomic.h>
 
-_Thread_local static _Atomic(sigjmp_buf *) CHECKED_ACCESS_RETBUF;
+#include <setjmp.h>
+
+_Thread_local static _Atomic(jmp_buf *) CHECKED_ACCESS_RETBUF;
 
 _Thread_local static _Atomic(struct CheckedAccessError *) CHECKED_ACCESS_ERROR;
 
@@ -17,8 +18,8 @@ struct CheckedAccessError
 
 long __checked_memcpy_impl(void *restrict _dest, const void *restrict _src, size_t _len, struct CheckedAccessError *_acc)
 {
-    sigjmp_buf _buf;
-    if (sigsetjmp(_buf, 1))
+    jmp_buf _buf;
+    if (setjmp(_buf))
     {
         atomic_store_explicit(&CHECKED_ACCESS_RETBUF, NULL, memory_order_relaxed);
         atomic_load_explicit(&CHECKED_ACCESS_RETBUF, memory_order_acquire); // We know what store this locks to.
@@ -37,7 +38,7 @@ static void sa_handler_impl(int sig, siginfo_t *inf, void *uctx)
 {
     if ((sig == SIGSEGV || sig == SIGBUS))
     {
-        sigjmp_buf *_ptr = atomic_load_explicit(&CHECKED_ACCESS_RETBUF, memory_order_acquire);
+        jmp_buf *_ptr = atomic_load_explicit(&CHECKED_ACCESS_RETBUF, memory_order_acquire);
 
         if (_ptr)
         {
@@ -45,7 +46,7 @@ static void sa_handler_impl(int sig, siginfo_t *inf, void *uctx)
 
             _acc->addr = inf->si_addr;
             atomic_store_explicit(&CHECKED_ACCESS_ERROR, _acc + 1, memory_order_release);
-            siglongjmp(*_ptr, 1); // This is a checked memory access trapping.
+            longjmp(*_ptr, 1); // This is a checked memory access trapping.
         }
     }
 

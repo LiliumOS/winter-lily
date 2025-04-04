@@ -19,6 +19,8 @@ unsafe extern "C" fn __sa_handler_seh_impl(signo: u32, siginfo: *mut siginfo_t, 
 #[cfg(target_arch = "x86_64")]
 #[naked]
 unsafe extern "C" fn invoke_syscall_uctx(uctx: *const c_void) {
+    use crate::libc::{REG_R8, REG_R9, REG_R10, REG_RAX, REG_RDI, REG_RDX, REG_RSI};
+
     unsafe {
         naked_asm! {
             "push rbx",
@@ -35,13 +37,13 @@ unsafe extern "C" fn invoke_syscall_uctx(uctx: *const c_void) {
             "mov qword ptr [rbx+8*{RAX}], rax",
             "pop rbx",
             "ret",
-            RAX = const 0,
-            RDI = const 1,
-            RSI = const 2,
-            RDX = const 3,
-            R10 = const 4,
-            R8 = const 5,
-            R9 = const 6,
+            RAX = const REG_RAX,
+            RDI = const REG_RDI,
+            RSI = const REG_RSI,
+            RDX = const REG_RDX,
+            R10 = const REG_R10,
+            R8 = const REG_R8,
+            R9 = const REG_R9,
             handle_syscall = sym __handle_syscall
         }
     }
