@@ -12,6 +12,8 @@
     "files.associations": {
         "setjmp.h": "c",
         "signal.h": "c",
-        "siginfo.h": "c"
+        "siginfo.h": "c",
+        "signal-defs.h": "c",
+        "*.inc": "c"
     }
 }

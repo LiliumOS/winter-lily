@@ -35,6 +35,7 @@ pub mod libc;
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");
 
+use helpers::__install_sa_handler;
 pub use wl_interface_map::*;
 
 #[thread_local]
@@ -43,11 +44,18 @@ static SYS_INTERCEPT_STOP: AtomicI8 = AtomicI8::new(1);
 
 /// Initializes the process for winter-lily
 #[unsafe(export_name = wl_setup_process_name!())]
-pub unsafe extern "C" fn __wl_impl_setup_process(
+unsafe extern "C" fn __wl_impl_setup_process(
     wl_load_base: *mut u8,
     wl_load_size: usize,
     mode: FilterMode,
 ) {
+    println!(
+        "wl_impl_setup_process called. Protected Region ({wl_load_base:p}..{:p})",
+        wl_load_base.wrapping_add(wl_load_size)
+    );
+    unsafe {
+        __install_sa_handler();
+    }
     match mode {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         FilterMode::Prctl => {

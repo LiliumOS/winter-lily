@@ -4,7 +4,7 @@
 typedef void (*sighandler_t)(int);
 typedef void (*sigaction_handler_t)(int, siginfo_t *, void *);
 
-typedef struct sigaction
+typedef struct
 {
     union
     {

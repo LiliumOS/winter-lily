@@ -17,6 +17,8 @@ use linux_syscall::{SYS_getpid, SYS_kill, SYS_rt_sigaction, syscall};
 
 mod rt_impls;
 
+pub(crate) use rt_impls::__install_sa_handler;
+
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 #[repr(usize)]
 pub enum AccessType {

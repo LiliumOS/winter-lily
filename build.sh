@@ -58,10 +58,10 @@ cargo build -Z build-std="core,alloc"  --target-dir "$CARGO_TARGET_DIR" --target
 
 mkdir -p "$PREFIX/etc"
 
-touch "$PREFIX/etc/ld.so.conf"
+echo > "$PREFIX/etc/ld.so.conf"
 
-echo "$PREFIX/lib" >> $PREFIX/etc/ld.so.conf
-echo "$PREFIX/$LIB_TARG" >> $PREFIX/etc/ld.so.conf
-echo "$PREFIX/$TARGET_RUST/lib" >> $PREFIX/etc/ld.so.conf
-echo "$PREFIX/$TARGET_RUST/$LIB_TARG" >> $PREFIX/etc/ld.so.conf
+# echo "$PREFIX/lib" >> $PREFIX/etc/ld.so.conf
+# echo "$PREFIX/$LIB_TARG" >> $PREFIX/etc/ld.so.conf
+# echo "$PREFIX/$TARGET_RUST/lib" >> $PREFIX/etc/ld.so.conf
+# echo "$PREFIX/$TARGET_RUST/$LIB_TARG" >> $PREFIX/etc/ld.so.conf
 fi

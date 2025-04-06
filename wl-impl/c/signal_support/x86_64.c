@@ -55,7 +55,7 @@ static void sa_handler_impl(int sig, siginfo_t *inf, void *uctx)
 
 void __install_sa_handler()
 {
-    struct sigaction sa = {
+    sigaction_t sa = {
         .sa_sigaction = sa_handler_impl,
         .sa_flags = SA_SIGINFO};
     for (int i = 0; i < SIGRTMIN; i++)

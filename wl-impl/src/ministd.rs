@@ -91,9 +91,63 @@ impl<K, V, S, A: Allocator> core::ops::DerefMut for HashMap<K, V, S, A> {
     }
 }
 
+use linux_syscall::{SYS_write, syscall};
 pub use rustix::fd::*;
 
 pub mod raw_mutex;
 
 pub type Mutex<T> = lock_api::Mutex<raw_mutex::Futex, T>;
 pub type RwLock<T> = lock_api::RwLock<raw_mutex::Futex, T>;
+
+pub struct Stdio(BorrowedFd<'static>);
+
+impl core::fmt::Write for Stdio {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        use linux_syscall::ResultSize;
+        let mut b = s.as_bytes();
+
+        while !b.is_empty() {
+            match unsafe {
+                syscall!(SYS_write, self.0.as_raw_fd(), b.as_ptr(), b.len()).try_usize()
+            } {
+                Ok(0) => return Err(core::fmt::Error),
+                Ok(v) => b = &b[v..],
+                Err(_) => return Err(core::fmt::Error),
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub use core::fmt;
+
+pub use core::{write, writeln};
+
+pub fn stdout() -> Stdio {
+    Stdio(unsafe { rustix::stdio::stdout() })
+}
+
+pub fn stderr() -> Stdio {
+    Stdio(unsafe { rustix::stdio::stderr() })
+}
+
+#[macro_export]
+macro_rules! println {
+    ($($args:tt)*) => {
+        {
+            use $crate::ministd::fmt::Write as _;
+            $crate::ministd::writeln!($crate::ministd::stdout(), $($args)*).unwrap();
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! eprintln {
+    ($($args:tt)*) => {
+        {
+            use $crate::ministd::fmt::Write;
+            $crate::ministd::writeln!($crate::ministd::stderr(), $($args)*).unwrap();
+        }
+    };
+}
