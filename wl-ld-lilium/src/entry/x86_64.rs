@@ -63,9 +63,42 @@ pub unsafe extern "sysv64" fn __call_entry_point(
     unsafe {
         naked_asm! {
             "pop rax",
-            "pop rax",
-            "sub rsp, "
-
+            "pop r10",
+            "push rax",
+            "shl rdi, 3",
+            "shl rcx, 3",
+            "shl r9, 4",
+            "push 0", //
+            "push 0", // AT_END
+            "sub rsp, r9",
+            "2:",
+            "test r9, r9",
+            "je 3f",
+            "lea r9, [r9-16]",
+            "movups xmm0, xmmword ptr [r8+r9]",
+            "movaps xmmword ptr [r8+r9], xmm0",
+            "jmp 2b",
+            "3:",
+            "mov rbx, rsp",
+            "push 0",
+            "2:",
+            "test rcx, rcx",
+            "je 3f",
+            "lea rcx, [rcx-8]",
+            "push qword ptr [rdx+rcx]",
+            "jmp 2b",
+            "3:",
+            "mov r12, rsp",
+            "push 0",
+            "2:",
+            "test rdi, rdi",
+            "je 2f",
+            "lea rdi, [rdi-8]",
+            "push qword ptr [rsi+rdi]",
+            "2:",
+            "push rdi",
+            "mov rax, 1",
+            "jmp r10"
         }
     }
 }

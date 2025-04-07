@@ -1,15 +1,6 @@
 [submodule "wl-ld-lilium/ld-so-impl"]
 	path = wl-ld-lilium/ld-so-impl
 	url = https://github.com/LiliumOS/ld-so-impl.git
-[submodule "musl"]
-	path = musl
-	url = https://git.musl-libc.org/git/musl
-[submodule "gcc"]
-	path = gcc
-	url = https://github.com/gcc-mirror/gcc.git
-[submodule "binutils-gdb"]
-	path = binutils-gdb
-	url = https://github.com/bminor/binutils-gdb.git
 [submodule "pooled-alloc"]
 	path = pooled-alloc
 	url = https://github.com/LiliumOS/pooled-alloc.git
