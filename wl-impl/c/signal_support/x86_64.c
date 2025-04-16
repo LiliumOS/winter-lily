@@ -58,6 +58,6 @@ void __install_sa_handler()
     sigaction_t sa = {
         .sa_sigaction = sa_handler_impl,
         .sa_flags = SA_SIGINFO};
-    for (int i = 0; i < SIGRTMIN; i++)
+    for (int i = 0; i < 32; i++)
         sigaction(i, &sa, NULL);
 }

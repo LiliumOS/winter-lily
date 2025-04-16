@@ -143,6 +143,16 @@ macro_rules! println {
 }
 
 #[macro_export]
+macro_rules! print {
+    ($($args:tt)*) => {
+        {
+            use $crate::ministd::fmt::Write as _;
+            $crate::ministd::write!($crate::ministd::stdout(), $($args)*).unwrap();
+        }
+    }
+}
+
+#[macro_export]
 macro_rules! eprintln {
     ($($args:tt)*) => {
         {
@@ -150,4 +160,14 @@ macro_rules! eprintln {
             $crate::ministd::writeln!($crate::ministd::stderr(), $($args)*).unwrap();
         }
     };
+}
+
+#[macro_export]
+macro_rules! eprint {
+    ($($args:tt)*) => {
+        {
+            use $crate::ministd::fmt::Write as _;
+            $crate::ministd::write!($crate::ministd::stderr(), $($args)*).unwrap();
+        }
+    }
 }

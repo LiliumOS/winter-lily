@@ -63,6 +63,7 @@ unsafe extern "C-unwind" fn longjmp(buf: *mut jmp_buf, status: i32) -> ! {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct sigaction_t {
     pub sa_handler: MaybeValid<unsafe extern "C" fn(signo: c_int)>,
     pub sa_mask: kernel_sigset_t,
@@ -76,6 +77,8 @@ pub unsafe extern "C" fn sigaction(
     src: *mut sigaction_t,
 ) -> i32 {
     use linux_raw_sys::general::{SA_RESTORER, kernel_sigaction};
+
+    // eprint!("sigaction({signum}, {:?}, {src:p})", unsafe { &*action });
 
     let ksig_action = kernel_sigaction {
         sa_handler_kernel: unsafe { core::mem::transmute((*action).sa_handler) },
@@ -100,6 +103,8 @@ pub unsafe extern "C" fn sigaction(
     };
 
     let r = res.as_usize_unchecked() as i32;
+
+    // eprintln!(" = {r}");
 
     if r >= 0 && src.is_null() {
         unsafe {
@@ -170,6 +175,8 @@ mod regno_imp {
 }
 
 pub use regno_imp::*;
+
+use crate::{eprint, eprintln};
 
 #[repr(C)]
 #[cfg(target_arch = "x86_64")]

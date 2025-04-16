@@ -118,7 +118,7 @@ impl LoaderImpl for FdLoader {
                 offset = (offset + 4095) & !4095;
             }
 
-            if len > 0 {
+            if file_len > 0 {
                 if addr.addr() & 4095 != (phdr.p_offset as usize) & 4095 {
                     todo!()
                 }
@@ -126,12 +126,20 @@ impl LoaderImpl for FdLoader {
                 let f_offset = offset & !4095;
 
                 let extra_len = offset - f_offset;
+                eprintln!(
+                    "mmap({addr:p} (adjusted {:p}), {file_len:#018x} (adjusted: {:#018x}), {perms:03b}, MAP_PRIVATE | MAP_FIXED, {}, {:#018x} (adjusted: {:#018x})",
+                    addr.map_addr(|v| v & !4095),
+                    extra_len + file_len,
+                    map_desc.addr() as i32,
+                    phdr.p_offset,
+                    phdr.p_offset & !4095,
+                );
                 let res = unsafe {
                     syscall!(
                         SYS_mmap,
                         addr.map_addr(|v| v & !4095),
                         extra_len + file_len,
-                        perms,
+                        PROT_READ | PROT_WRITE,
                         linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_FIXED,
                         map_desc.addr() as i32,
                         phdr.p_offset & !4095
@@ -139,7 +147,30 @@ impl LoaderImpl for FdLoader {
                 };
                 res.check().map_err(|_| Error::LoadError)?;
 
+                let file_start = addr.map_addr(|v| v & !4095);
+
+                unsafe {
+                    core::ptr::write_bytes(file_start, 0, addr.offset_from_unsigned(file_start));
+                }
+
+                let file_end = addr.wrapping_add(file_len);
+
                 let end = addr.wrapping_add(len);
+
+                unsafe {
+                    core::ptr::write_bytes(end, 0, end.offset_from_unsigned(file_end));
+                }
+
+                let res = unsafe {
+                    syscall!(
+                        SYS_mprotect,
+                        addr.map_addr(|v| v & !4095),
+                        extra_len + len,
+                        perms
+                    )
+                };
+                res.check().map_err(|_| Error::LoadError)?;
+
                 last_addr = end.wrapping_sub(1);
                 last_perms = perms;
             }
