@@ -84,6 +84,7 @@ impl LoaderImpl for FdLoader {
             let mut addr = base_addr.wrapping_offset(phdr.p_paddr as isize);
             let mut len = phdr.p_memsz as usize;
             let mut file_len = phdr.p_filesz as usize;
+            let mut offset = phdr.p_offset as usize;
 
             let mut perms = linux_raw_sys::general::PROT_READ;
 
@@ -114,17 +115,22 @@ impl LoaderImpl for FdLoader {
                 len = len.saturating_sub(4096);
                 file_len = file_len.saturating_sub(4096);
                 addr = addr.map_addr(|v| (v + 4095) & !4095);
+                offset = (offset + 4095) & !4095;
             }
 
             if len > 0 {
                 if addr.addr() & 4095 != (phdr.p_offset as usize) & 4095 {
                     todo!()
                 }
+
+                let f_offset = offset & !4095;
+
+                let extra_len = offset - f_offset;
                 let res = unsafe {
                     syscall!(
                         SYS_mmap,
                         addr.map_addr(|v| v & !4095),
-                        file_len,
+                        extra_len + file_len,
                         perms,
                         linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_FIXED,
                         map_desc.addr() as i32,

@@ -1,6 +1,8 @@
 use alloc::borrow::ToOwned;
 use ld_so_impl::elf::ElfHeader;
 use ld_so_impl::loader::Error;
+use lilium_sys::sys::auxv::{AT_LILIUM_INIT_HANDLES, AT_LILIUM_INIT_HANDLES_LEN, AT_RANDOM};
+use lilium_sys::sys::handle::{Handle, HandlePtr};
 use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
@@ -40,7 +42,7 @@ static NATIVE_REGION_BASE: FusedUnsafeCell<SyncPointer<*const c_void>> =
     FusedUnsafeCell::new(SyncPointer::null());
 
 unsafe extern "C" fn __rust_entry(
-    argc: i32,
+    argc: usize,
     mut argv: *mut *mut c_char,
     envp: *mut *mut c_char,
     auxv: *mut AuxEnt,
@@ -52,10 +54,11 @@ unsafe extern "C" fn __rust_entry(
             linux_raw_sys::prctl::PR_SET_VMA,
             linux_raw_sys::prctl::PR_SET_VMA_ANON_NAME,
             stack_addr,
-            STACK_SIZE - 4096,
+            STACK_SIZE,
             c"ldso-stack".as_ptr()
         );
     }
+    let envpc = unsafe { auxv.cast::<*mut c_char>().offset_from_unsigned(envp) };
     unsafe { __ENV.as_ptr().write(crate::helpers::SyncPointer(envp)) }
     let base_addr = safe_addr_of_mut!(__base_addr);
 
@@ -326,11 +329,38 @@ unsafe extern "C" fn __rust_entry(
 
     pread_exact(execfd, 0, bytemuck::bytes_of_mut(&mut header)).unwrap();
 
-    let entry = header.e_entry;
+    let entry = unsafe { binary.base.add(header.e_entry as usize) };
 
-    eprintln!("Found _start {entry:#018X}");
+    eprintln!("Found _start {entry:p}");
 
-    0
+    __setup_auxv(auxv, entry, argv, argc, envp, envpc, &mut rand)
+}
+
+fn __setup_auxv(
+    host_auxv: &[AuxEnt],
+    entry: *mut c_void,
+    argv: *mut *mut c_char,
+    argc: usize,
+    envp: *mut *mut c_char,
+    envpc: usize,
+    rand: &mut Gen,
+) -> ! {
+    let mut lilium_aux = bytemuck::zeroed::<[AuxEnt; 16]>();
+    let mut random_bytes = [rand.next(), rand.next()];
+    lilium_aux[0] = AuxEnt {
+        at_tag: AT_RANDOM as usize,
+        at_val: core::ptr::addr_of_mut!(random_bytes).cast(),
+    };
+    lilium_aux[1] = AuxEnt {
+        at_tag: AT_LILIUM_INIT_HANDLES as usize,
+        at_val: core::ptr::dangling_mut::<HandlePtr<Handle>>().cast(),
+    };
+    lilium_aux[2] = AuxEnt {
+        at_tag: AT_LILIUM_INIT_HANDLES_LEN as usize,
+        at_val: udata(0),
+    };
+
+    unsafe { __call_entry_point(argc, argv, envp, envpc, lilium_aux.as_mut_ptr(), 3, entry) }
 }
 
 unsafe extern "C" {
@@ -371,3 +401,6 @@ fn resolve_error(c: &core::ffi::CStr, e: Error) -> ! {
 }
 
 use crate::ldso::{self, __MMAP_ADDR, SearchType};
+
+#[cfg(target_arch = "x86_64")]
+use x86_64::__call_entry_point;
