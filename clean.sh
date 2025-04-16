@@ -14,6 +14,6 @@ toolbuilds )
     ;;
 all )
     cargo clean
-    make -C musl distclean
+    # make -C musl distclean
     ;;
 esac

@@ -47,7 +47,6 @@ mod iface;
 mod io;
 mod ldso;
 mod loader;
-mod rand;
 mod resolver;
 
 mod detect;

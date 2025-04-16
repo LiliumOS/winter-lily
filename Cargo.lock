@@ -427,6 +427,7 @@ dependencies = [
 name = "wl-helpers"
 version = "0.1.0"
 dependencies = [
+ "lccc-siphash",
  "linux-raw-sys 0.9.3",
  "linux-syscall",
 ]
@@ -466,7 +467,6 @@ dependencies = [
  "bytemuck",
  "cfg-match",
  "fake-enum",
- "lccc-siphash",
  "ld-so-impl",
  "lilium-sys",
  "linux-errno",

@@ -13,6 +13,7 @@ use linux_raw_sys::general::AT_FDCWD;
 use linux_syscall::{Result as _, SYS_close, SYS_open, SYS_write, syscall};
 
 use bytemuck::Zeroable;
+use wl_interface_map::wl_init_subsystem_name;
 
 use crate::entry::RESOLVER;
 use crate::env::{self, get_env};
@@ -240,4 +241,21 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
     };
 
     unsafe { RESOLVER.load_from_handle(Some(winter_soname), udata, fhdl) }
+}
+
+pub fn load_and_init_subsystem(
+    name: &'static str,
+    winter_soname: &'static CStr,
+) -> &'static DynEntry {
+    let ent = load_subsystem(name, winter_soname);
+
+    let init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), ent);
+    eprintln!("Found libusi-{name}.so:__init_subsystem {init_subsystem:p}");
+
+    let init_subsystem: wl_interface_map::InitSubsystemTy =
+        unsafe { core::mem::transmute(init_subsystem) };
+
+    init_subsystem();
+
+    ent
 }

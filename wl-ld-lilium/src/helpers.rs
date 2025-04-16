@@ -1,6 +1,7 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
     cell::UnsafeCell,
+    ffi::c_int,
     marker::PhantomData,
     mem::MaybeUninit,
     ops::{Deref, Range},
@@ -189,8 +190,8 @@ pub use wl_helpers::*;
 
 pub use ld_so_impl::helpers::*;
 use linux_syscall::{
-    SYS_close, SYS_getdents64, SYS_mmap, SYS_mremap, SYS_munmap, SYS_open, SYS_openat, SYS_write,
-    syscall,
+    SYS_close, SYS_getdents64, SYS_mmap, SYS_mremap, SYS_munmap, SYS_open, SYS_openat, SYS_pread64,
+    SYS_read, SYS_write, syscall,
 };
 
 pub fn copy_to_slice_head<'a, T: Copy>(dest: &'a mut [T], src: &[T]) -> &'a mut [T] {
@@ -542,4 +543,25 @@ pub fn expand_glob(
     let _ = unsafe { syscall!(SYS_close, fd) };
 
     res
+}
+
+pub fn pread_exact(fd: c_int, mut offset: u64, mut buf: &mut [u8]) -> crate::io::Result<()> {
+    use linux_syscall::ResultSize;
+    while !buf.is_empty() {
+        let len = buf.len();
+        match unsafe { syscall!(SYS_pread64, fd, buf.as_mut_ptr(), len, offset) }.try_usize() {
+            Ok(0) => return Err(linux_errno::ENODATA),
+            Ok(n) => {
+                buf = &mut buf[n..];
+                offset += n as u64;
+            }
+            Err(linux_errno::EINTR) => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+}
+
+pub const fn udata(val: usize) -> *mut c_void {
+    core::ptr::without_provenance_mut(val)
 }

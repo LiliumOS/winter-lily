@@ -12,18 +12,22 @@ pub enum FilterMode {
     Seccomp,
 }
 
-pub type SetupProcessTy =
-    unsafe extern "C" fn(wl_load_base: *mut u8, wl_load_size: usize, mode: FilterMode);
+pub type SetupProcessTy = unsafe extern "C" fn(
+    wl_load_base: *mut u8,
+    wl_load_size: usize,
+    mode: FilterMode,
+    rand_init: [u8; 16],
+);
 
 pub type InitSubsystemTy = extern "C" fn();
 
 #[macro_export]
 macro_rules! wl_setup_process_name {
     () => {
-        "__wl_init_setup_process"
+        "__wl_init_setup_process_v0"
     };
     (C) => {
-        c"__wl_init_setup_process"
+        c"__wl_init_setup_process_v0"
     };
 }
 

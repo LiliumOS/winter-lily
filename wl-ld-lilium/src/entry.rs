@@ -1,11 +1,11 @@
 use alloc::borrow::ToOwned;
-use lccc_siphash::{RawSipHasher, SipHashState};
+use ld_so_impl::elf::ElfHeader;
 use ld_so_impl::loader::Error;
 use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
 use linux_syscall::{Result as _, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
-use wl_interface_map::wl_setup_process_name;
+use wl_interface_map::{wl_init_subsystem_name, wl_setup_process_name};
 
 use core::ffi::{CStr, c_char, c_ulong, c_void};
 use core::ptr::NonNull;
@@ -16,9 +16,11 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
-use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly};
+use crate::helpers::{
+    FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly, rand::Gen,
+};
+use crate::helpers::{pread_exact, udata};
 use crate::loader::{LOADER, Tcb, set_tp};
-use crate::rand::Gen;
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
@@ -292,22 +294,41 @@ unsafe extern "C" fn __rust_entry(
 
     let setup_process: wl_interface_map::SetupProcessTy = unsafe { core::mem::transmute(sym) };
 
+    let rand_bytes = bytemuck::must_cast([rand.next(), rand.next()]);
+
     unsafe {
         setup_process(
-            NATIVE_REGION_BASE.0.cast_mut().cast(),
+            native_region_base.cast_mut().cast(),
             NATIVE_REGION_SIZE,
             wl_interface_map::FilterMode::Prctl,
+            rand_bytes,
         )
     }
 
-    let base_init_subsystem = RESOLVER.find_sym_in(c"__init_subsystem", base);
+    let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base);
 
-    eprintln!("Found libusi-base.so:__base {base_init_subsystem:p}");
+    eprintln!("Found libusi-base.so:__init_subsystem {base_init_subsystem:p}");
 
     let base_init_subsystem: wl_interface_map::InitSubsystemTy =
         unsafe { core::mem::transmute(base_init_subsystem) };
 
-    // base_init_subsystem();
+    base_init_subsystem();
+
+    let mut header: ElfHeader = bytemuck::zeroed();
+
+    let binary = unsafe {
+        WL_RESOLVER.load_from_handle(
+            None,
+            udata(SearchType::Winter as usize),
+            udata(execfd as usize),
+        )
+    };
+
+    pread_exact(execfd, 0, bytemuck::bytes_of_mut(&mut header)).unwrap();
+
+    let entry = header.e_entry;
+
+    eprintln!("Found _start {entry:#018X}");
 
     0
 }

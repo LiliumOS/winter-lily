@@ -9,3 +9,4 @@ linux-raw-sys = { version = "0.9.3", default-features = false, features = [
     "no_std",
 ] }
 linux-syscall = "1.0.0"
+lccc-siphash = { git = "https://github.com/lccc-project/lccc-siphash.git", version = "0.1.0" }

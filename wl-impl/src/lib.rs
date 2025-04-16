@@ -32,10 +32,15 @@ pub mod ministd;
 
 pub mod libc;
 
+pub mod rand;
+
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");
 
 use helpers::__install_sa_handler;
+use ministd::Mutex;
+use rand::GLOBAL_SEED;
+use wl_helpers::rand::Gen;
 pub use wl_interface_map::*;
 
 #[thread_local]
@@ -44,10 +49,12 @@ static SYS_INTERCEPT_STOP: AtomicI8 = AtomicI8::new(1);
 
 /// Initializes the process for winter-lily
 #[unsafe(export_name = wl_setup_process_name!())]
+#[allow(improper_ctypes_definitions)] // We're fine here, just calling Rust-Rust
 unsafe extern "C" fn __wl_impl_setup_process(
     wl_load_base: *mut u8,
     wl_load_size: usize,
     mode: FilterMode,
+    rand_init: [u8; 16],
 ) {
     println!(
         "wl_impl_setup_process called. Protected Region ({wl_load_base:p}..{:p})",
@@ -56,6 +63,7 @@ unsafe extern "C" fn __wl_impl_setup_process(
     unsafe {
         __install_sa_handler();
     }
+    let _ = GLOBAL_SEED.set(Mutex::new(Gen::seed(rand_init)));
     match mode {
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         FilterMode::Prctl => {

@@ -86,6 +86,7 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Constructs a new uninitialized [`OnceLock<T>`]
     pub const fn new() -> Self {
         Self {
             lock: AtomicUsize::new(0),
@@ -93,6 +94,8 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Constructs a new [`OnceLock<T>`] that is already initialized to `val`
+    /// This is useful when you have a generic API
     pub const fn new_init(val: T) -> Self {
         Self {
             lock: AtomicUsize::new(INIT),
@@ -100,10 +103,18 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Takes the inner value of the [`OnceLock<T>`] if any.
+    ///
+    /// Safety guaranteed by taking ownership of `self`
     pub fn into_inner(mut self) -> Option<T> {
         self.take()
     }
 
+    /// Takes the inner value of the [`OnceLock<T>`], if any, reseting it to an uninitialized state.
+    ///
+    /// Safety guaranteed by taking ownership of `self`.
+    ///
+    /// Note: This is equivalent to `core::mem::replace(self, OnceLock::new()).into_inner()`
     pub fn take(&mut self) -> Option<T> {
         if self.is_init_non_atomic() {
             *self.lock.get_mut() = 0;
@@ -113,6 +124,7 @@ impl<T> OnceLock<T> {
         }
     }
 
+    /// Forceably unlocks the [`OnceLock`].
     pub fn force_unlock(&mut self) {
         *self.lock.get_mut() &= !LOCK;
     }
@@ -454,3 +466,5 @@ unsafe impl Allocator for MmapAllocator {
         NonNull::new(core::ptr::slice_from_raw_parts_mut(ptr, new_size)).ok_or(AllocError)
     }
 }
+
+pub mod rand;
