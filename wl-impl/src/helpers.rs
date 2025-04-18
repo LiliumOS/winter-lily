@@ -279,7 +279,7 @@ pub fn exit_unrecoverably(except: Option<Uuid>) -> ! {
     }
     let pid = unsafe { syscall!(SYS_getpid).as_u64_unchecked() };
     unsafe {
-        syscall!(
+        let _ = syscall!(
             SYS_rt_sigaction,
             SIGQUIT,
             &sigaction {
@@ -292,11 +292,12 @@ pub fn exit_unrecoverably(except: Option<Uuid>) -> ! {
             core::mem::size_of::<linux_raw_sys::general::sigset_t>()
         );
 
-        syscall!(SYS_kill, pid, SIGQUIT);
+        let _ = syscall!(SYS_kill, pid, SIGQUIT);
     }
     loop {
         unsafe {
-            syscall!(SYS_kill, pid, SIGKILL);
+            // This never returns
+            let _ = syscall!(SYS_kill, pid, SIGKILL);
         } // Support dumping core later
     }
 }
