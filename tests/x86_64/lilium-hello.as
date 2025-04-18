@@ -37,9 +37,11 @@ _start:
 .hello:
     .ascii "Hello World!"
 
+.align 16
+
 .err:
     # 466fbae6-be8b-5525-bd04-ee7153b74f55
     .quad 0xbd04ee7153b74f55
-    .quad 0x466fbae6be8b
+    .quad 0x466fbae6be8b5525
     .quad 0
     .quad 0

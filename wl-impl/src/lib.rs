@@ -9,7 +9,8 @@
     array_into_iter_constructors,
     iter_advance_by,
     allocator_api,
-    alloc_layout_extra
+    alloc_layout_extra,
+    inline_const_pat
 )]
 #![no_std]
 

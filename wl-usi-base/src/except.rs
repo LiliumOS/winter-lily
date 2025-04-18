@@ -1,9 +1,8 @@
-use lilium_sys::sys::except::ExceptionInfo;
-use wl_impl::{export_syscall, helpers::exit_unrecoverably};
+use lilium_sys::sys::except::ExceptionStatusInfo;
+use wl_impl::{eprintln, export_syscall, helpers::exit_unrecoverably};
 
 export_syscall! {
-    unsafe extern fn UnmanagedException(_ptr: *const ExceptionInfo) -> ! {
-        // we don't yet support exception reporting, so just hard-crash.
-        exit_unrecoverably()
+    unsafe extern fn UnmanagedException(ptr: *const ExceptionStatusInfo) -> ! {
+        exit_unrecoverably(Some(unsafe{(*ptr).except_code}))
     }
 }

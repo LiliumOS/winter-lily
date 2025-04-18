@@ -126,23 +126,21 @@ impl LoaderImpl for FdLoader {
                 let f_offset = offset & !4095;
 
                 let extra_len = offset - f_offset;
+                let adjusted_len = extra_len + file_len;
                 eprintln!(
-                    "mmap({addr:p} (adjusted {:p}), {file_len:#018x} (adjusted: {:#018x}), {perms:03b}, MAP_PRIVATE | MAP_FIXED, {}, {:#018x} (adjusted: {:#018x})",
+                    "mmap({addr:p} (adjusted {:p}), {file_len:#018x} (adjusted: {adjusted_len:#018x}), {perms:03b}, MAP_PRIVATE | MAP_FIXED, {}, {offset:#018x} (adjusted: {f_offset:#018x})",
                     addr.map_addr(|v| v & !4095),
-                    extra_len + file_len,
                     map_desc.addr() as i32,
-                    phdr.p_offset,
-                    phdr.p_offset & !4095,
                 );
                 let res = unsafe {
                     syscall!(
                         SYS_mmap,
                         addr.map_addr(|v| v & !4095),
-                        extra_len + file_len,
+                        adjusted_len,
                         PROT_READ | PROT_WRITE,
                         linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_FIXED,
                         map_desc.addr() as i32,
-                        phdr.p_offset & !4095
+                        f_offset,
                     )
                 };
                 res.check().map_err(|_| Error::LoadError)?;
@@ -158,7 +156,7 @@ impl LoaderImpl for FdLoader {
                 let end = addr.wrapping_add(len);
 
                 unsafe {
-                    core::ptr::write_bytes(end, 0, end.offset_from_unsigned(file_end));
+                    core::ptr::write_bytes(file_end, 0, end.offset_from_unsigned(file_end));
                 }
 
                 let res = unsafe {

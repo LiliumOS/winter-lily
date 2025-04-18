@@ -78,7 +78,7 @@ pub unsafe extern "C" fn sigaction(
 ) -> i32 {
     use linux_raw_sys::general::{SA_RESTORER, kernel_sigaction};
 
-    // eprint!("sigaction({signum}, {:?}, {src:p})", unsafe { &*action });
+    eprint!("sigaction({signum}, {:?}, {src:p})", unsafe { &*action });
 
     let ksig_action = kernel_sigaction {
         sa_handler_kernel: unsafe { core::mem::transmute((*action).sa_handler) },
@@ -98,15 +98,16 @@ pub unsafe extern "C" fn sigaction(
                 core::ptr::null_mut()
             } else {
                 &raw mut rksig_action
-            }
+            },
+            core::mem::size_of::<kernel_sigset_t>(),
         )
     };
 
     let r = res.as_usize_unchecked() as i32;
 
-    // eprintln!(" = {r}");
+    eprintln!(" = {r}");
 
-    if r >= 0 && src.is_null() {
+    if r >= 0 && !src.is_null() {
         unsafe {
             (*src).sa_handler = core::mem::transmute(rksig_action.sa_handler_kernel);
         }

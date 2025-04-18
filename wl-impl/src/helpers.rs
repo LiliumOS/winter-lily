@@ -5,6 +5,7 @@ use core::{
 };
 
 use bytemuck::{NoUninit, Zeroable};
+use lilium_sys::uuid::Uuid;
 use lilium_sys::{
     result::{Error as SysError, Result as SysResult},
     sys::{
@@ -267,7 +268,15 @@ pub const fn insert_elems<T: Copy, const N: usize, const R: usize>(
     base
 }
 
-pub fn exit_unrecoverably() -> ! {
+mod strexcept;
+
+pub fn exit_unrecoverably(except: Option<Uuid>) -> ! {
+    if let Some(except) = except {
+        eprintln!(
+            "Crashing with unhandled exception: {:#}",
+            strexcept::strexcept(except)
+        );
+    }
     let pid = unsafe { syscall!(SYS_getpid).as_u64_unchecked() };
     unsafe {
         syscall!(
@@ -631,3 +640,5 @@ pub const fn const_parse_u32(v: &str, radix: u32) -> u32 {
 }
 
 pub use wl_helpers::*;
+
+use crate::eprintln;
