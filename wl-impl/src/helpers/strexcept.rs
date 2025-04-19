@@ -18,9 +18,9 @@ enum StrExceptInner {
 
 pub fn strexcept(uuid: Uuid) -> StrExcept {
     match uuid {
-        const { parse_uuid("05e3080f-ded6-54a7-acfd-afec3d7e93cb") } => {
-            StrExcept(StrExceptInner::Named("Emulation Error (winter-lily ICE"))
-        }
+        const { parse_uuid("05e3080f-ded6-54a7-acfd-afec3d7e93cb") } => StrExcept(
+            StrExceptInner::Named("Emulation Error (winter-lily Interal Error)"),
+        ),
         const { parse_uuid("4c0c6658-59ae-5675-90c3-ffcc0a7219ad") } => {
             StrExcept(StrExceptInner::Named("Uncaught Runtime Exception"))
         }

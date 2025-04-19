@@ -1,11 +1,34 @@
-use core::panic::PanicInfo;
+use core::panic::{Location, PanicInfo};
 
 use lilium_sys::uuid::parse_uuid;
 
-use crate::helpers::exit_unrecoverably;
+use crate::{eprintln, helpers::exit_unrecoverably};
+
+struct PrintLoc<'a>(Option<&'a Location<'a>>);
+
+impl<'a> core::fmt::Display for PrintLoc<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if let Some(loc) = self.0 {
+            f.write_fmt(format_args!(
+                "{} {}:{}",
+                loc.file(),
+                loc.line(),
+                loc.column()
+            ))
+        } else {
+            f.write_str("unknown location")
+        }
+    }
+}
 
 #[panic_handler]
 fn at_panic(info: &PanicInfo) -> ! {
-    // TODO: Print panic
-    exit_unrecoverably(Some(parse_uuid("01964aac-9df4-7745-8585-6b9e2fc929d8")))
+    eprintln!(
+        "Program Panicked at: [{}] {}",
+        PrintLoc(info.location()),
+        info.message()
+    );
+    exit_unrecoverably(Some(
+        const { parse_uuid("05e3080f-ded6-54a7-acfd-afec3d7e93cb") },
+    ))
 }

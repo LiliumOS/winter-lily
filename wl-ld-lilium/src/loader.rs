@@ -1,7 +1,7 @@
 use core::{
     ffi::c_void,
     fmt::Write,
-    sync::atomic::{AtomicPtr, AtomicUsize},
+    sync::atomic::{AtomicPtr, AtomicUsize, Ordering},
 };
 
 use ld_so_impl::{
@@ -252,21 +252,34 @@ impl LoaderImpl for FdLoader {
         { STDERR }.write_str(st)
     }
 
-    fn alloc_tls(&self, tls_size: usize) -> Result<usize, Error> {
+    fn alloc_tls(&self, tls_size: usize, tls_align: usize) -> Result<usize, Error> {
         let val = self
             .tls_off
-            .fetch_add(tls_size, core::sync::atomic::Ordering::Relaxed);
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                let next = (v + (tls_align - 1)) & !(v + (tls_align - 1)) + tls_size;
+                if next > (TLS_BLOCK_SIZE >> 1) {
+                    return None;
+                } else {
+                    return Some(next);
+                }
+            })
+            .map_err(|_| Error::AllocError)?;
 
-        if (val + tls_size) > (TLS_BLOCK_SIZE >> 1) {
-            return Err(Error::AllocError);
-        }
+        let aligned_val = (val + (tls_align - 1)) & !(tls_align - 1);
 
         let pg = get_tp().map_addr(|a| a + (val & !4095));
 
-        let res = unsafe { syscall!(SYS_mprotect, pg, tls_size, PROT_READ | PROT_WRITE) };
+        let res = unsafe {
+            syscall!(
+                SYS_mprotect,
+                pg,
+                tls_size + (aligned_val - (val & !4095)),
+                PROT_READ | PROT_WRITE
+            )
+        };
 
         res.check().map_err(|_| Error::AllocError)?;
-        Ok(val)
+        Ok(aligned_val)
     }
 
     fn tls_direct_offset(&self, module: usize) -> Result<usize, Error> {

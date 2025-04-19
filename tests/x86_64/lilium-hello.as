@@ -5,19 +5,16 @@
 _start:
     pop rdi
     lea rdi, [rdi+1]
-    lea rsi, [rsp+8*rdi]
-    _start._find_auxv:
-    mov rax, qword ptr [rsi]
-    lea rsi, [rsi+1]
-    test rax, rax
-    jnz _start._find_auxv
+    mov rsi, rbx # 
     _start._find_init_hdls:
     mov eax, dword ptr [rsi]
     test eax, eax
-    jmp _start._auxv_end_err
+    je _start._auxv_end_err
     cmp eax, 64 # AT_LILIUM_INIT_HANDLES
+    je _start._init_found
     lea rsi, [rsi+16]
     jmp _start._find_init_hdls
+    _start._init_found:
     mov rsi, qword ptr [rsi-8]
     mov rdi, qword ptr [rsi+8] # stdout handle
     mov rax, 0x2001 # IOWrite

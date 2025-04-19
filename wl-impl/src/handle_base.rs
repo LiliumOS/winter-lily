@@ -34,11 +34,17 @@ pub struct Handle {
 static HANDLE_ARRAY: [UnsafeCell<Handle>; 512] =
     [const { UnsafeCell::new(bytemuck::zeroed()) }; 512];
 
-pub unsafe fn insert_handle(handle: Handle) -> Result<HandlePtr<Handle>> {
-    for n in &HANDLE_ARRAY {
-        let v = n.get();
+#[thread_local]
+static START_HINT: Cell<usize> = Cell::new(0);
+
+pub fn insert_handle(handle: Handle) -> Result<HandlePtr<Handle>> {
+    let start = START_HINT.get();
+    for n in (0..512).map(|n| (n + start) & 511) {
+        let h = &HANDLE_ARRAY[n];
+        let v = h.get();
 
         if unsafe { v.cast::<usize>().read() } == 0 {
+            START_HINT.set(n);
             unsafe {
                 v.write(handle);
             }
@@ -112,6 +118,11 @@ unsafe extern "C" fn get_init_handles(kslice: &mut KSlice<HandlePtr<sys::Handle>
         blob2: core::ptr::null_mut(),
         fd: STDERR_FILENO as i64,
     };
+    let sl = unsafe { kslice.as_slice_mut() };
+    sl[0] = insert_handle(stdin).unwrap().cast();
+    sl[1] = insert_handle(stdout).unwrap().cast();
+    sl[2] = insert_handle(stderr).unwrap().cast();
+    kslice.len = 3;
 }
 
 const _: GetInitHandlesTy = get_init_handles;
