@@ -152,7 +152,7 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 [[package]]
 name = "lilium-sys"
 version = "0.1.0"
-source = "git+https://github.com/LiliumOS/lilium-sys.git#42d5c74da1392a2e352a8c88e7e64177f7fd59a3"
+source = "git+https://github.com/LiliumOS/lilium-sys.git#ea2256b582e4aa44af5b6f2c3fc3b2343701496e"
 dependencies = [
  "bitflags",
  "bytemuck",
@@ -459,6 +459,9 @@ dependencies = [
 [[package]]
 name = "wl-interface-map"
 version = "0.1.0"
+dependencies = [
+ "lilium-sys",
+]
 
 [[package]]
 name = "wl-ld-lilium"
@@ -493,5 +496,6 @@ name = "wl-usi-io"
 version = "0.1.0"
 dependencies = [
  "lilium-sys",
+ "linux-syscall",
  "wl-impl",
 ]

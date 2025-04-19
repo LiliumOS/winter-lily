@@ -36,6 +36,7 @@ def_syscall! {
     fn mmap(addr_hint: *mut c_void, length: usize, prot: c_uint, flags: c_uint, fd: c_int, off: __kernel_off_t) -> *mut c_void;
     fn munmap(addr: *mut c_void, length: usize) -> ();
     fn mremap(old_addr: *mut c_void, old_len: usize, new_len: usize, flags: c_uint) -> *mut c_void;
+    fn write(fd: i32, data: *const c_void, len: usize) -> usize;
 }
 
 pub trait FromSysVal {

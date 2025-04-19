@@ -7,6 +7,7 @@ build = "../build-usi-lib.rs"
 [dependencies]
 wl-impl.workspace = true
 lilium-sys.workspace = true
+linux-syscall.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

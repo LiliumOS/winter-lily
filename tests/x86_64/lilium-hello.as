@@ -20,7 +20,7 @@ _start:
     jmp _start._find_init_hdls
     mov rsi, qword ptr [rsi-8]
     mov rdi, qword ptr [rsi+8] # stdout handle
-    mov rax, 0x1001 # IOWrite
+    mov rax, 0x2001 # IOWrite
     lea rsi, [.hello + rip]
     mov rdx, 12
     syscall

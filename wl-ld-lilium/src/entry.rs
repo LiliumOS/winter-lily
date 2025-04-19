@@ -3,11 +3,14 @@ use ld_so_impl::elf::ElfHeader;
 use ld_so_impl::loader::Error;
 use lilium_sys::sys::auxv::{AT_LILIUM_INIT_HANDLES, AT_LILIUM_INIT_HANDLES_LEN, AT_RANDOM};
 use lilium_sys::sys::handle::{Handle, HandlePtr};
+use lilium_sys::sys::kstr::KSlice;
 use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
 use linux_syscall::{Result as _, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
-use wl_interface_map::{wl_init_subsystem_name, wl_setup_process_name};
+use wl_interface_map::{
+    GetInitHandlesTy, wl_get_init_handles_name, wl_init_subsystem_name, wl_setup_process_name,
+};
 
 use core::ffi::{CStr, c_char, c_ulong, c_void};
 use core::ptr::NonNull;
@@ -317,6 +320,8 @@ unsafe extern "C" fn __rust_entry(
 
     base_init_subsystem();
 
+    ldso::load_and_init_subsystem("io", c"libusi-io.so");
+
     let mut header: ElfHeader = bytemuck::zeroed();
 
     let binary = unsafe {
@@ -346,18 +351,30 @@ fn __setup_auxv(
     rand: &mut Gen,
 ) -> ! {
     let mut lilium_aux = bytemuck::zeroed::<[AuxEnt; 16]>();
+    let mut init_handles = bytemuck::zeroed::<[HandlePtr<Handle>; 64]>();
     let mut random_bytes = [rand.next(), rand.next()];
+    let mut init_handles = KSlice::from_slice_mut(&mut init_handles);
+
+    let get_init_handles = RESOLVER.find_sym(wl_get_init_handles_name!(C));
+
+    eprintln!("Found get_init_handles: {get_init_handles:p}");
+
+    let get_init_handles: GetInitHandlesTy = unsafe { core::mem::transmute(get_init_handles) };
+    unsafe {
+        get_init_handles(&mut init_handles);
+    }
+
     lilium_aux[0] = AuxEnt {
         at_tag: AT_RANDOM as usize,
         at_val: core::ptr::addr_of_mut!(random_bytes).cast(),
     };
     lilium_aux[1] = AuxEnt {
         at_tag: AT_LILIUM_INIT_HANDLES as usize,
-        at_val: core::ptr::dangling_mut::<HandlePtr<Handle>>().cast(),
+        at_val: init_handles.arr_ptr.cast(),
     };
     lilium_aux[2] = AuxEnt {
         at_tag: AT_LILIUM_INIT_HANDLES_LEN as usize,
-        at_val: udata(0),
+        at_val: udata(init_handles.len),
     };
 
     unsafe { __call_entry_point(argc, argv, envp, envpc, lilium_aux.as_mut_ptr(), 3, entry) }

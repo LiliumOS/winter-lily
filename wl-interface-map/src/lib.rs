@@ -1,5 +1,10 @@
 #![no_std]
 
+use lilium_sys::sys::{
+    handle::{Handle, HandlePtr},
+    kstr::KSlice,
+};
+
 #[non_exhaustive]
 #[repr(usize)]
 pub enum FilterMode {
@@ -34,9 +39,21 @@ macro_rules! wl_setup_process_name {
 #[macro_export]
 macro_rules! wl_init_subsystem_name {
     () => {
-        "__wl_init_subsystem"
+        "__wl_init_subsystem_v0"
     };
     (C) => {
-        c"__wl_init_subsystem"
+        c"__wl_init_subsystem_v0"
+    };
+}
+
+pub type GetInitHandlesTy = unsafe extern "C" fn(&mut KSlice<HandlePtr<Handle>>);
+
+#[macro_export]
+macro_rules! wl_get_init_handles_name {
+    () => {
+        "__wl_get_init_handles_v0"
+    };
+    (C) => {
+        c"__wl_get_init_handles_v0"
     };
 }

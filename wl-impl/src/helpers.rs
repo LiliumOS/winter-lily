@@ -13,6 +13,7 @@ use lilium_sys::{
         option::ExtendedOptionHead,
     },
 };
+use linux_errno::{EINTR, EPERM};
 use linux_raw_sys::general::{SIGKILL, SIGQUIT, sigaction, sigset_t};
 use linux_syscall::{SYS_getpid, SYS_kill, SYS_rt_sigaction, syscall};
 
@@ -643,3 +644,11 @@ pub const fn const_parse_u32(v: &str, radix: u32) -> u32 {
 pub use wl_helpers::*;
 
 use crate::eprintln;
+
+pub fn linux_error_to_lilium(errno: linux_errno::Error) -> lilium_sys::result::Error {
+    match errno {
+        EINTR => lilium_sys::result::Error::Interrupted,
+        EPERM => lilium_sys::result::Error::Permission,
+        _ => lilium_sys::result::Error::from_code(-0x800).unwrap_err(), // Error 8:0 in winter-lily is the winter-lily unknown error
+    }
+}
