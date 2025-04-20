@@ -7,7 +7,7 @@ use lilium_sys::sys::kstr::KSlice;
 use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
-use linux_syscall::{Result as _, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
+use linux_syscall::{Result as _, SYS_close, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
 use wl_interface_map::{
     GetInitHandlesTy, wl_get_init_handles_name, wl_init_subsystem_name, wl_setup_process_name,
 };
@@ -141,6 +141,7 @@ unsafe extern "C" fn __rust_entry(
             Some(c"ld-lilium-x86_64.so"),
             core::ptr::null_mut(),
             !0,
+            None,
         );
     }
 
@@ -334,6 +335,7 @@ unsafe extern "C" fn __rust_entry(
     };
 
     pread_exact(execfd, 0, bytemuck::bytes_of_mut(&mut header)).unwrap();
+    let _ = unsafe { syscall!(SYS_close, execfd) };
 
     let entry = unsafe { binary.base.add(header.e_entry as usize) };
 

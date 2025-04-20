@@ -14,7 +14,7 @@ use ld_so_impl::{
 use linux_errno::EINTR;
 use linux_raw_sys::general::{__kernel_off_t, ARCH_SET_FS, PROT_READ, PROT_WRITE};
 use linux_syscall::{
-    Result as _, SYS_arch_prctl, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, syscall,
+    Result as _, SYS_arch_prctl, SYS_close, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, syscall,
 };
 
 use crate::{
@@ -245,11 +245,17 @@ impl LoaderImpl for FdLoader {
 
         res.check().map_err(|_| Error::AllocError)?;
 
-        Ok(unsafe { core::ptr::with_exposed_provenance_mut(res.as_usize_unchecked()) })
+        Ok(core::ptr::with_exposed_provenance_mut(
+            res.as_usize_unchecked(),
+        ))
     }
 
     fn write_str(&self, st: &str) -> core::fmt::Result {
         { STDERR }.write_str(st)
+    }
+
+    unsafe fn close_hdl(&self, hdl: *mut c_void) {
+        let _ = unsafe { syscall!(SYS_close, hdl.addr() as i32) };
     }
 
     fn alloc_tls(&self, tls_size: usize, tls_align: usize) -> Result<usize, Error> {
