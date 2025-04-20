@@ -78,13 +78,19 @@ pub unsafe extern "C" fn sigaction(
 ) -> i32 {
     use linux_raw_sys::general::{SA_RESTORER, kernel_sigaction};
 
-    eprint!("sigaction({signum}, {:?}, {src:p})", unsafe { &*action });
+    eprint!("sigaction({signum}, {:?}, {src:p})", unsafe {
+        action.as_ref()
+    });
 
-    let ksig_action = kernel_sigaction {
-        sa_handler_kernel: unsafe { core::mem::transmute((*action).sa_handler) },
-        sa_flags: (unsafe { (*action).sa_flags } | SA_RESTORER | SA_SIGINFO) as u64,
-        sa_restorer: Some(impl_restorer),
-        sa_mask: unsafe { (*action).sa_mask },
+    let ksig_action = if !action.is_null() {
+        kernel_sigaction {
+            sa_handler_kernel: unsafe { core::mem::transmute((*action).sa_handler) },
+            sa_flags: (unsafe { (*action).sa_flags } | SA_RESTORER | SA_SIGINFO) as u64,
+            sa_restorer: Some(impl_restorer),
+            sa_mask: unsafe { (*action).sa_mask },
+        }
+    } else {
+        unsafe { core::mem::zeroed() }
     };
 
     let mut rksig_action: kernel_sigaction = unsafe { core::mem::zeroed() };
@@ -93,7 +99,11 @@ pub unsafe extern "C" fn sigaction(
         syscall!(
             SYS_rt_sigaction,
             signum,
-            &raw const ksig_action,
+            if action.is_null() {
+                core::ptr::null()
+            } else {
+                &raw const ksig_action
+            },
             if src.is_null() {
                 core::ptr::null_mut()
             } else {
