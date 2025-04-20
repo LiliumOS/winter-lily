@@ -321,6 +321,7 @@ unsafe extern "C" fn __rust_entry(
     base_init_subsystem();
 
     ldso::load_and_init_subsystem("io", c"libusi-io.so");
+    ldso::load_and_init_subsystem("process", c"libusi-process.so");
 
     let mut header: ElfHeader = bytemuck::zeroed();
 

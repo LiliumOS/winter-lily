@@ -60,6 +60,8 @@ mkdir -p "$PREFIX/etc"
 
 echo > "$PREFIX/etc/ld.so.conf"
 
+(cd tests/$ARCH && ./build.sh) || exit $?
+
 # echo "$PREFIX/lib" >> $PREFIX/etc/ld.so.conf
 # echo "$PREFIX/$LIB_TARG" >> $PREFIX/etc/ld.so.conf
 # echo "$PREFIX/$TARGET_RUST/lib" >> $PREFIX/etc/ld.so.conf

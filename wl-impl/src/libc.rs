@@ -24,6 +24,7 @@ macro_rules! def_syscall{
 
             $crate::libc::Check::check(&res)?;
 
+            #[allow(unreachable_code)]
             Ok(unsafe { $crate::libc::FromSysVal::from_raw(res.as_usize_unchecked()) })
         })*
     };
@@ -37,6 +38,7 @@ def_syscall! {
     fn munmap(addr: *mut c_void, length: usize) -> ();
     fn mremap(old_addr: *mut c_void, old_len: usize, new_len: usize, flags: c_uint) -> *mut c_void;
     fn write(fd: i32, data: *const c_void, len: usize) -> usize;
+    fn exit(v: i32) -> !;
 }
 
 pub trait FromSysVal {
@@ -75,6 +77,12 @@ impl<T> FromSysVal for *const T {
 
 impl FromSysVal for () {
     unsafe fn from_raw(_: usize) -> Self {}
+}
+
+impl FromSysVal for ! {
+    unsafe fn from_raw(_: usize) -> Self {
+        unreachable!()
+    }
 }
 
 mod libc_defs;

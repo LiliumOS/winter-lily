@@ -2,4 +2,5 @@ export LD_LIBRARY_PATH_WL_HOST="$(pwd)/target/${TARGET_RUST}/${TARGET_PATH}:$(pw
 export WL_NATIVE_LD_SO_CONF="$PREFIX/etc/ld.so.conf"
 export WL_SUBSYS_base="target/${TARGET_RUST}/${TARGET_PATH}/libwl_usi_base.so"
 export WL_SUBSYS_io="target/${TARGET_RUST}/${TARGET_PATH}/libwl_usi_io.so"
+export WL_SUBSYS_process="target/${TARGET_RUST}/${TARGET_PATH}/libwl_usi_process.so"
 unset WL_SYSROOT

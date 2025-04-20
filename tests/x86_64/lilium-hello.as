@@ -19,7 +19,7 @@ _start:
     mov rdi, qword ptr [rsi+8] # stdout handle
     mov rax, 0x2001 # IOWrite
     lea rsi, [.hello + rip]
-    mov rdx, 12
+    mov rdx, 13
     syscall
     mov rax, 0x3000 # ExitProcess
     mov rdi, 0
@@ -32,7 +32,7 @@ _start:
     _start._end:
 
 .hello:
-    .ascii "Hello World!"
+    .ascii "Hello World!\n"
 
 .align 16
 

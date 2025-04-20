@@ -499,3 +499,12 @@ dependencies = [
  "linux-syscall",
  "wl-impl",
 ]
+
+[[package]]
+name = "wl-usi-process"
+version = "0.1.0"
+dependencies = [
+ "lilium-sys",
+ "linux-syscall",
+ "wl-impl",
+]
