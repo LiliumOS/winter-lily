@@ -15,7 +15,7 @@ _start:
     lea rsi, [rsi+16]
     jmp _start._find_init_hdls
     _start._init_found:
-    mov rsi, qword ptr [rsi-8]
+    mov rsi, qword ptr [rsi+8]
     mov rdi, qword ptr [rsi+8] # stdout handle
     mov rax, 0x2001 # IOWrite
     lea rsi, [.hello + rip]
