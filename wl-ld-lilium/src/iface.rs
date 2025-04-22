@@ -1,6 +1,10 @@
 use core::arch::naked_asm;
 use core::{arch::global_asm, ffi::c_void};
 
+use lilium_sys::sys::kstr::KStrPtr;
+
+use crate::entry::WL_RESOLVER;
+
 #[repr(C)]
 pub struct TlsDesc {
     module: usize,

@@ -129,7 +129,7 @@ done
 
 . "$whereami/target.sh"
 
-[ $_dry_run -eq 1 ] || "$whereami/build.sh" || exit $?
+[ $_dry_run -eq 1 ] || RELEASE=1 "$whereami/build.sh" || exit $?
 
 _sysroot="${sysroot:-$HOME/.wl}"
 
@@ -143,6 +143,17 @@ case "${exec_prefix}" in
         ;;
 esac
 
+case "${bindir}" in
+    [/\\]*)
+        _bindir="${bindir}"
+        ;;
+    *)
+        _bindir="${_exec_prefix}/${bindir:-bin}"
+    ;;
+esac
+
+_bindir="$(echo "$_bindir" | sed -e "s|//\+|/|g")"
+
 case "${libdir}" in
     [/\\]*)
         _libdir="${libdir}"
@@ -151,6 +162,8 @@ case "${libdir}" in
         _libdir="${_exec_prefix}/${libdir:-lib}"
     ;;
 esac
+
+_libdir="$(echo "$_libdir" | sed -e "s|//\+|/|g")"
 
 case "${host_libdir}" in
     [/\\]*)
@@ -161,14 +174,28 @@ case "${host_libdir}" in
     ;;
 esac
 
+_host_libdir="$(echo "$_host_libdir" | sed -e "s|//\+|/|g")"
+
 case "${sysconfdir}" in
     [/\\]*)
-        _libdir="${sysconfdir}"
+        _sysconfdir="${sysconfdir}"
         ;;
     *)
-        _libdir="${_prefix}/${sysconfdir:-etc}"
+        _sysconfdir="${_prefix}/${sysconfdir:-etc}"
     ;;
 esac
+_sysconfdir="$(echo "$_sysconfdir" | sed -e "s|//\+|/|g")"
+
+case "${syslibdir}" in
+    [/\\*])
+        _syslibdir="${syslibdir}"
+        ;;
+    *)
+        _syslibdir="/${syslibdir:-lib}"
+        ;;
+esac
+
+_syslibdir="$(echo "$_syslibdir" | sed -e "s|//\+|/|g")"
 
 case "${STRIP:-no}" in
     1|y|yes|true)
@@ -188,18 +215,18 @@ install_dir(){
 }
 
 install_prg(){
-    [ $_verbose -ne 0 ] && echo install -m755 $_strip_opts -D -t "${_sysroot}$1" "$2"
-    [ $_dry_run -eq 1 ] || install -m755 $_strip_opts -D -t "${_sysroot}$1" "$2"
+    [ $_verbose -ne 0 ] && echo install -m755 $_strip_opts -D -T "$2" "${_sysroot}$1"
+    [ $_dry_run -eq 1 ] || install -m755 $_strip_opts -D -T "$2" "${_sysroot}$1"
 }
 
 install_lib(){
-    [ $_verbose -ne 0 ] && echo install -m644 $_strip_opts -D -t "${_sysroot}$1" "$2"
-    [ $_dry_run -eq 1 ] || install -m644 $_strip_opts -D -t "${_sysroot}$1" "$2"
+    [ $_verbose -ne 0 ] && echo install -m644 $_strip_opts -D -T "$2" "${_sysroot}$1"
+    [ $_dry_run -eq 1 ] || install -m644 $_strip_opts -D -T "$2" "${_sysroot}$1"
 }
 
 install_other(){
-    [ $_verbose -ne 0 ] && echo install -m644 -D -t "${_sysroot}$1" "$2"
-    [ $_dry_run -eq 1 ] || install -m644 -D -t "${_sysroot}$1" "$2"
+    [ $_verbose -ne 0 ] && echo install -m644 -D -T "$2" "${_sysroot}$1"
+    [ $_dry_run -eq 1 ] || install -m644 -D -T "$2" "${_sysroot}$1"
 }
 
 install_link() {
@@ -213,7 +240,7 @@ install_template() {
     _target="$1"
     _file="$2"
     shift 2
-    [ $_verbose -ne 0 ] && echo sed install -m${_mode} -D -T "$_file" "${_sysroot}$_target"
+    [ $_verbose -ne 0 ] && echo sed install -m${_mode} -D -T "$_file" "${_sysroot}${_target}"
     _fname="$(mktemp)"
     [ $_verbose -gt 1 ] && echo "Temporary File ${_fname}"
     for arg in "$@"
@@ -223,22 +250,22 @@ install_template() {
 
     [ $_verbose -gt 1 ] && echo "sed ${_sed_args[*]}"
     cat "$_file" | sed "${_sed_args[@]}" > "$_fname" || return $?
-    [ $_dry_run -eq 1 ] || install -m${_mode} -D -T "$_tmpfile" "${_sysroot}$target" || return $?
-    [ $_save_temps -ne 1 ] && unlink "$_tmpfile"
+    [ $_dry_run -eq 1 ] || install -m${_mode} -D -T "$_fname" "${_sysroot}${_target}" || return $?
+    [ $_save_temps -ne 1 ] && unlink "$_fname"
 }
 
 libdir="$_libdir" host_libdir="$_host_libdir" install_template "${_sysconfdir}/ld-lilium.so.conf" "${whereami}/install/ld-lilium.so.conf.in" libdir host_libdir || exit $?
 libdir="$_libdir" host_libdir="$_host_libdir" install_template "${_sysconfdir}/ld.so.conf" "${whereami}/install/ld.so.conf.in" libdir host_libdir || exit $?
 
-install_lib "${_host_libdir}/libc.so" "$PREFIX/lib/libc.so" || exit $?
-install_lib "${_host_libdir}libgcc_s.so.1" "$PREFIX/$TARGET_RUST/$LIBTARG/libgcc_s.so.1" || exit $?
-install_prg "${_syslibdir}/ld-lilium-$ARCH.so.1" "$CARGO_TARGET_PATH/$TARGET_LD/libwl_ld_lilium.so" || exit $?
+# install_lib "${_host_libdir}/libc.so" "$PREFIX/lib/libc.so" || exit $?
+# install_lib "${_host_libdir}libgcc_s.so.1" "$PREFIX/$TARGET_RUST/$LIBTARG/libgcc_s.so.1" || exit $?
+install_prg "${_syslibdir}/ld-lilium-$ARCH.so.1" "$CARGO_TARGET_DIR/$TARGET_LD/release/libwl_ld_lilium.so" || exit $?
 
 install_mode=755 install_template "${_bindir}/winter-lily" "${whereami}/install/winter-lily.in" ARCH || exit $?
 
-install_lib "${_host_libdir}/libwl_impl.so" "$CARGO_TARGET_PATH/$TARGET_RUST/libwl_impl.so" || exit $?
-for subsys in base io
+install_lib "${_host_libdir}/libwl_impl.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_impl.so" || exit $?
+for subsys in base io process
 do
-    install_lib "${_host_libdir}/libwl-usi-$subsys.so" "$CARGO_TARGET_PATH/$TARGET_RUST/libwl_usi_$subsys.so" || exit $?
+    install_lib "${_host_libdir}/libwl-usi-$subsys.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_usi_$subsys.so" || exit $?
     libdir="$_libdir" host_libdir="$_host_libdir" usilib="$subsys" install_template "${_libdir}/libusi-$subsys.so" "${whereami}/install/scripts/libusi-X.so.in" libdir host_libdir usilib || exit $?
 done
