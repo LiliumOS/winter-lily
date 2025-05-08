@@ -254,6 +254,8 @@ pub fn load_and_init_subsystem(
 ) -> &'static DynEntry {
     let ent = load_subsystem(name, winter_soname);
 
+    // eprintln!("Loaded libusi-{name}.so: {ent:#x?}");
+
     let init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), ent, false);
     eprintln!("Found libusi-{name}.so:__init_subsystem {init_subsystem:p}");
 
