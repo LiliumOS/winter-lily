@@ -39,6 +39,9 @@ def_syscall! {
     fn mremap(old_addr: *mut c_void, old_len: usize, new_len: usize, flags: c_uint) -> *mut c_void;
     fn write(fd: i32, data: *const c_void, len: usize) -> usize;
     fn exit(v: i32) -> !;
+    fn exit_group(v: i32) -> !;
+    fn getpid() -> __kernel_pid_t;
+    fn pidfd_open(pid: __kernel_pid_t, flags: c_uint) -> i32;
 }
 
 pub trait FromSysVal {
@@ -93,4 +96,8 @@ pub fn siginfo(
     info_handler: unsafe extern "C" fn(signo: c_int, info: *const siginfo_t, ucontext: *mut c_void),
 ) -> MaybeValid<unsafe extern "C" fn(signo: c_int)> {
     unsafe { core::mem::transmute(info_handler) }
+}
+
+unsafe extern "C" {
+    pub safe fn __rtld_get_thread_ptr() -> *mut c_void;
 }

@@ -1,15 +1,10 @@
 [package]
-name = "wl-usi-io"
+name = "wl-usi-thread"
 edition.workspace = true
 version.workspace = true
-build = "../build-usi-lib.rs"
 
 [dependencies]
 wl-impl.workspace = true
 lilium-sys.workspace = true
 linux-syscall.workspace = true
 bytemuck.workspace = true
-cordyceps = { version = "0.3.3", features = ["alloc"] }
-
-[lib]
-crate-type = ["cdylib"]

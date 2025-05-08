@@ -25,7 +25,7 @@ use crate::helpers::{
     FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly, rand::Gen,
 };
 use crate::helpers::{pread_exact, udata};
-use crate::loader::{LOADER, Tcb, set_tp};
+use crate::loader::{LOADER, TLS_MC, Tcb, set_tp, setup_tls_mc};
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
@@ -269,7 +269,43 @@ unsafe extern "C" fn __rust_entry(
     let init_tls_block =
         core::ptr::with_exposed_provenance_mut::<c_void>(init_tls_block.as_usize_unchecked());
 
-    let tp = init_tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1);
+    let tlsmc = init_tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1);
+
+    let res = unsafe {
+        syscall!(
+            SYS_mprotect,
+            tlsmc,
+            core::mem::size_of::<Tcb>(),
+            PROT_READ | PROT_WRITE
+        )
+    };
+
+    if res.check().is_err() {
+        crash_unrecoverably();
+    }
+
+    unsafe { setup_tls_mc(tlsmc) }
+
+    let tls_block = unsafe {
+        syscall!(
+            SYS_mmap,
+            tls_block_ptr,
+            TLS_BLOCK_SIZE,
+            PROT_NONE,
+            MAP_PRIVATE | MAP_ANONYMOUS,
+            -1,
+            0
+        )
+    };
+
+    if tls_block.check().is_err() {
+        crash_unrecoverably();
+    }
+
+    let tls_block =
+        core::ptr::with_exposed_provenance_mut::<c_void>(tls_block.as_usize_unchecked());
+
+    let tp = tls_block.wrapping_add(TLS_BLOCK_SIZE >> 1);
 
     let res = unsafe {
         syscall!(
@@ -303,6 +339,10 @@ unsafe extern "C" fn __rust_entry(
 
     let rand_bytes = bytemuck::must_cast([rand.next(), rand.next()]);
 
+    let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base);
+
+    eprintln!("Found libusi-base.so:__init_subsystem {base_init_subsystem:p}");
+
     unsafe {
         setup_process(
             native_region_base.cast_mut().cast(),
@@ -311,10 +351,6 @@ unsafe extern "C" fn __rust_entry(
             rand_bytes,
         )
     }
-
-    let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base);
-
-    eprintln!("Found libusi-base.so:__init_subsystem {base_init_subsystem:p}");
 
     let base_init_subsystem: wl_interface_map::InitSubsystemTy =
         unsafe { core::mem::transmute(base_init_subsystem) };

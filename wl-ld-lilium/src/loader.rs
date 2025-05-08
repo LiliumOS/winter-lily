@@ -5,6 +5,7 @@ use core::{
 };
 
 use ld_so_impl::{
+    arch::crash_unrecoverably,
     elf::{
         ElfOffset, ElfSize,
         consts::{self, PT_LOAD},
@@ -16,10 +17,11 @@ use linux_raw_sys::general::{__kernel_off_t, ARCH_SET_FS, PROT_READ, PROT_WRITE}
 use linux_syscall::{
     Result as _, SYS_arch_prctl, SYS_close, SYS_lseek, SYS_mmap, SYS_mprotect, SYS_read, syscall,
 };
+use wl_helpers::sync::RwLock;
 
 use crate::{
     entry::TLS_BLOCK_SIZE,
-    helpers::debug,
+    helpers::{FusedUnsafeCell, SyncPointer, debug},
     io::STDERR,
     is_x86_feature_detected,
     ldso::{self, SearchType},
@@ -273,7 +275,7 @@ impl LoaderImpl for FdLoader {
 
         let aligned_val = (val + (tls_align - 1)) & !(tls_align - 1);
 
-        let pg = get_tp().map_addr(|a| a + (val & !4095));
+        let pg = TLS_MC.0.map_addr(|a| a + (val & !4095));
 
         let res = unsafe {
             syscall!(
@@ -283,6 +285,10 @@ impl LoaderImpl for FdLoader {
                 PROT_READ | PROT_WRITE
             )
         };
+
+        unsafe {
+            (*get_master_tcb()).load_size += tls_size + (aligned_val - val);
+        }
 
         res.check().map_err(|_| Error::AllocError)?;
         Ok(aligned_val)
@@ -300,7 +306,7 @@ impl LoaderImpl for FdLoader {
         sz: ElfSize,
     ) -> Result<(), Error> {
         // TODO: Load Master Copy and mark as dirty for other threads
-        let tp = get_tp();
+        let tp = TLS_MC.0;
 
         let module = tp.wrapping_add(tls_module);
 
@@ -310,9 +316,18 @@ impl LoaderImpl for FdLoader {
     }
 }
 
-#[repr(C)]
+pub static TLS_MC: FusedUnsafeCell<SyncPointer<*mut c_void>> =
+    FusedUnsafeCell::new(SyncPointer::null_mut());
+
+pub fn get_master_tcb() -> *mut Tcb {
+    TLS_MC.0.cast()
+}
+
+#[repr(C, align(32))]
 pub struct Tcb {
     tls_base: *mut c_void,
+    pub load_size: usize,
+    pub dyn_size: usize,
 }
 
 pub static LOADER: FdLoader = FdLoader {
@@ -321,9 +336,60 @@ pub static LOADER: FdLoader = FdLoader {
     tls_off: AtomicUsize::new(core::mem::size_of::<Tcb>()),
 };
 
+pub static LOAD_LOCK: RwLock<()> = RwLock::new(());
+
+/// # Safety
+/// May be called at most once and before any threads are spawned
+pub unsafe fn setup_tls_mc(tls_mc: *mut c_void) {
+    unsafe {
+        TLS_MC.as_ptr().write(SyncPointer(tls_mc));
+    }
+    unsafe {
+        get_master_tcb().write(Tcb {
+            tls_base: core::ptr::null_mut(),
+            load_size: core::mem::size_of::<Tcb>(),
+            dyn_size: 0,
+        })
+    }
+}
+
+pub fn update_tls() {
+    let _guard = LOAD_LOCK.read();
+    let tp = get_tp();
+    let tlsmc = TLS_MC.0;
+    let tcb = unsafe { &mut *(tp.cast::<Tcb>()) };
+    let mtcb = unsafe { &*tlsmc.cast::<Tcb>() };
+    if tcb.load_size < mtcb.load_size {
+        let len = mtcb.load_size - tcb.load_size;
+        let pg = tp.map_addr(|a| a + (tcb.load_size & !4095));
+        let res = unsafe {
+            syscall!(
+                SYS_mprotect,
+                pg,
+                mtcb.load_size - (tcb.load_size & !4095),
+                PROT_READ | PROT_WRITE
+            )
+        };
+
+        if let Err(e) = res.check() {
+            eprintln!("TCB Update failed: {e:?}");
+            crash_unrecoverably()
+        }
+
+        unsafe {
+            core::ptr::copy_nonoverlapping(tlsmc.add(tcb.load_size), tp.add(tcb.load_size), len);
+        }
+        tcb.load_size = mtcb.load_size;
+    }
+}
+
 pub fn set_tp(ptr: *mut c_void) {
     unsafe {
-        ptr.cast::<Tcb>().write(Tcb { tls_base: ptr });
+        ptr.cast::<Tcb>().write(Tcb {
+            tls_base: ptr,
+            load_size: core::mem::size_of::<Tcb>(),
+            dyn_size: 0,
+        });
     }
     cfg_match::cfg_match! {
         target_arch = "x86_64" => if is_x86_feature_detected!("fsgsbase"){
@@ -331,8 +397,9 @@ pub fn set_tp(ptr: *mut c_void) {
         } else {
             unsafe { let _ = syscall!(SYS_arch_prctl, ARCH_SET_FS, ptr.expose_provenance());}
         },
-
     }
+
+    update_tls()
 }
 
 pub fn get_tp() -> *mut c_void {

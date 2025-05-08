@@ -10,7 +10,8 @@
     iter_advance_by,
     allocator_api,
     alloc_layout_extra,
-    inline_const_pat
+    inline_const_pat,
+    once_cell_try
 )]
 #![no_std]
 
@@ -18,6 +19,7 @@ extern crate alloc;
 
 use core::sync::atomic::AtomicI8;
 
+pub mod eh;
 pub mod env;
 pub mod handle_base;
 pub mod helpers;
@@ -34,6 +36,8 @@ pub mod ministd;
 pub mod libc;
 
 pub mod rand;
+
+pub mod thread;
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("We only support linux for now");

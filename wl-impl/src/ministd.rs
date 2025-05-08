@@ -94,10 +94,7 @@ impl<K, V, S, A: Allocator> core::ops::DerefMut for HashMap<K, V, S, A> {
 use linux_syscall::{SYS_write, syscall};
 pub use rustix::fd::*;
 
-pub mod raw_mutex;
-
-pub type Mutex<T> = lock_api::Mutex<raw_mutex::Futex, T>;
-pub type RwLock<T> = lock_api::RwLock<raw_mutex::Futex, T>;
+pub use wl_helpers::sync::{self, Mutex, RwLock};
 
 pub struct Stdio(BorrowedFd<'static>);
 

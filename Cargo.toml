@@ -5,7 +5,7 @@ members = [
     "wl-usi-base",
     "wl-usi-io",
     "wl-ld-lilium",
-    "wl-interface-map", "wl-usi-process",
+    "wl-interface-map", "wl-usi-process", "wl-usi-thread",
 ]
 resolver = "3"
 

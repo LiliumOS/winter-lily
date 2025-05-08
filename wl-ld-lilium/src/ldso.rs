@@ -80,7 +80,7 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Res
 }
 
 use crate::helpers::SplitAscii;
-use crate::loader::LOADER;
+use crate::loader::{LOAD_LOCK, LOADER, update_tls};
 
 #[inline(never)]
 fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'static str> {
@@ -204,6 +204,7 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
 pub type Result<T> = core::result::Result<T, ld_so_impl::loader::Error>;
 
 pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'static DynEntry {
+    let _guard = LOAD_LOCK.write();
     let udata = core::ptr::without_provenance_mut(SearchType::Host as usize);
     let mut var_name = [0u8; 96];
     let next = copy_to_slice_head(&mut var_name, "WL_SUBSYS_".as_bytes());
@@ -242,6 +243,8 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
 
     let ret = unsafe { RESOLVER.load_from_handle(Some(winter_soname), udata, fhdl) };
     let _ = unsafe { syscall!(SYS_close, fhdl.addr() as i32) };
+    drop(_guard);
+    update_tls();
     ret
 }
 
