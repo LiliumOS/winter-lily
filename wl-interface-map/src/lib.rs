@@ -24,7 +24,9 @@ pub type SetupProcessTy = unsafe extern "C" fn(
     rand_init: [u8; 16],
 );
 
-pub type InitSubsystemTy = extern "C" fn();
+/// # Safety
+/// Must be called at most once per module before any other code (other than DT_INIT/DT_INITARR elements) is run
+pub type InitSubsystemTy = unsafe extern "C" fn();
 
 #[macro_export]
 macro_rules! wl_setup_process_name {

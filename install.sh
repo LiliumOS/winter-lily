@@ -264,7 +264,7 @@ install_prg "${_syslibdir}/ld-lilium-$ARCH.so.1" "$CARGO_TARGET_DIR/$TARGET_LD/r
 install_mode=755 install_template "${_bindir}/winter-lily" "${whereami}/install/winter-lily.in" ARCH || exit $?
 
 install_lib "${_host_libdir}/libwl_impl.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_impl.so" || exit $?
-for subsys in base io process
+for subsys in $(cat ${whereami}/subsysnames)
 do
     install_lib "${_host_libdir}/libwl-usi-$subsys.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_usi_$subsys.so" || exit $?
     libdir="$_libdir" host_libdir="$_host_libdir" usilib="$subsys" install_template "${_libdir}/libusi-$subsys.so" "${whereami}/install/scripts/libusi-X.so.in" libdir host_libdir usilib || exit $?

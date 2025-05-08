@@ -331,7 +331,7 @@ unsafe extern "C" fn __rust_entry(
     // eprintln!("Entries:");
     // eprintln!("{:#?}", RESOLVER.live_entries());
 
-    let sym = RESOLVER.find_sym(wl_setup_process_name!(C));
+    let sym = RESOLVER.find_sym(wl_setup_process_name!(C), false);
 
     eprintln!("Found __wl_impl_setup_process: {:p}", sym);
 
@@ -339,7 +339,7 @@ unsafe extern "C" fn __rust_entry(
 
     let rand_bytes = bytemuck::must_cast([rand.next(), rand.next()]);
 
-    let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base);
+    let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base, false);
 
     eprintln!("Found libusi-base.so:__init_subsystem {base_init_subsystem:p}");
 
@@ -355,10 +355,14 @@ unsafe extern "C" fn __rust_entry(
     let base_init_subsystem: wl_interface_map::InitSubsystemTy =
         unsafe { core::mem::transmute(base_init_subsystem) };
 
-    base_init_subsystem();
-
+    unsafe {
+        base_init_subsystem();
+    }
+    ldso::load_and_init_subsystem("thread", c"libusi-thread.so");
     ldso::load_and_init_subsystem("io", c"libusi-io.so");
     ldso::load_and_init_subsystem("process", c"libusi-process.so");
+    ldso::load_and_init_subsystem("debug", c"libusi-debug.so");
+    // ldso::load_and_init_subsystem("kmgmt", c"libusi-kmgmt.so");
 
     let mut header: ElfHeader = bytemuck::zeroed();
 
@@ -394,7 +398,7 @@ fn __setup_auxv(
     let mut random_bytes = [rand.next(), rand.next()];
     let mut init_handles = KSlice::from_slice_mut(&mut init_handles);
 
-    let get_init_handles = RESOLVER.find_sym(wl_get_init_handles_name!(C));
+    let get_init_handles = RESOLVER.find_sym(wl_get_init_handles_name!(C), false);
 
     eprintln!("Found get_init_handles: {get_init_handles:p}");
 
@@ -427,7 +431,7 @@ unsafe extern "C" {
 
 pub const SLIDE_MASK: usize = (4096 * 8 - 1) << 12;
 
-pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 16;
+pub const NATIVE_REGION_SIZE: usize = 4096 * 4096 * 64;
 
 pub const STACK_DISPLACEMENT: usize = 4096 * 8;
 

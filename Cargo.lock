@@ -822,6 +822,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wl-usi-debug"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "lilium-sys",
+ "wl-impl",
+]
+
+[[package]]
 name = "wl-usi-io"
 version = "0.1.0"
 dependencies = [
@@ -829,6 +838,15 @@ dependencies = [
  "cordyceps",
  "lilium-sys",
  "linux-syscall",
+ "wl-impl",
+]
+
+[[package]]
+name = "wl-usi-kmgmt"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "lilium-sys",
  "wl-impl",
 ]
 

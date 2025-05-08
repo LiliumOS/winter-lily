@@ -1,12 +1,11 @@
 [package]
-name = "wl-usi-thread"
+name = "wl-usi-%subsysname%"
 edition.workspace = true
 version.workspace = true
 
 [dependencies]
 wl-impl.workspace = true
 lilium-sys.workspace = true
-linux-syscall.workspace = true
 bytemuck.workspace = true
 
 [lib]

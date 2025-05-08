@@ -254,13 +254,15 @@ pub fn load_and_init_subsystem(
 ) -> &'static DynEntry {
     let ent = load_subsystem(name, winter_soname);
 
-    let init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), ent);
+    let init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), ent, false);
     eprintln!("Found libusi-{name}.so:__init_subsystem {init_subsystem:p}");
 
     let init_subsystem: wl_interface_map::InitSubsystemTy =
         unsafe { core::mem::transmute(init_subsystem) };
 
-    init_subsystem();
+    unsafe {
+        init_subsystem();
+    }
 
     ent
 }
