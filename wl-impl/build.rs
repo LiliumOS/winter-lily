@@ -78,6 +78,7 @@ fn main() {
         .cargo_metadata(true)
         .flag_if_supported("-ffreestanding")
         .flag("-ftls-model=initial-exec")
+        .flag("-fvisibility=protected")
         .include("c/signal_support/include")
         .include(format!("c/signal_support/include/{arch}/"))
         .compile("signal_support");

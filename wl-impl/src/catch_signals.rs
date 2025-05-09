@@ -3,7 +3,7 @@ use core::ffi::c_void;
 use lilium_sys::uuid::{Uuid, parse_uuid};
 use linux_raw_sys::general::{SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV, siginfo_t};
 
-use core::arch::naked_asm;
+use core::arch::{global_asm, naked_asm};
 
 use crate::libc::mcontext_t;
 
@@ -30,6 +30,11 @@ unsafe extern "C" fn __sa_handler_seh_impl(signo: u32, siginfo: *mut siginfo_t, 
     }
 
     exit_unrecoverably(Some(sig_to_except(signo)))
+}
+
+global_asm! {
+    ".protected {__sa_handler_seh_impl}",
+    __sa_handler_seh_impl = sym __sa_handler_seh_impl,
 }
 
 #[cfg(target_arch = "x86_64")]
