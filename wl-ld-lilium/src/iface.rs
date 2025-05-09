@@ -1,10 +1,13 @@
 use core::arch::naked_asm;
 use core::{arch::global_asm, ffi::c_void};
 
-use lilium_sys::sys::kstr::KStrPtr;
+use lilium_sys::sys::kstr::KStrCPtr;
+
+use core::mem::offset_of;
 
 use crate::entry::WL_RESOLVER;
-use crate::loader::{get_tp, update_tls};
+use crate::ldso::load_and_init_subsystem;
+use crate::loader::{TLS_MC, Tcb, get_tp, update_tls};
 
 #[repr(C)]
 pub struct TlsDesc {
@@ -16,10 +19,6 @@ pub struct TlsDesc {
 #[naked]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
-    use core::mem::offset_of;
-
-    use crate::loader::{TLS_MC, Tcb};
-
     unsafe {
         naked_asm! {
             "mov rax, qword ptr [{TLS_MC}+rip]",
@@ -69,4 +68,9 @@ unsafe extern "C" fn __rtld_get_thread_ptr() -> *mut c_void {
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __rtld_update_global_tcb() {
     update_tls()
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __rtld_wl_load_subsystem_by_name(p: KStrCPtr) {
+    load_and_init_subsystem(unsafe { p.as_str() });
 }

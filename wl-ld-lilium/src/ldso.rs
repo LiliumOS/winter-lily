@@ -203,9 +203,14 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
 
 pub type Result<T> = core::result::Result<T, ld_so_impl::loader::Error>;
 
-pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'static DynEntry {
+pub fn load_subsystem(name: &str) -> &'static DynEntry {
     let _guard = LOAD_LOCK.write();
     let udata = core::ptr::without_provenance_mut(SearchType::Host as usize);
+    let mut soname = [0u8; 96];
+    let next = copy_to_slice_head(&mut soname, "libusi-".as_bytes());
+    let next = copy_to_slice_head(next, name.as_bytes());
+    copy_to_slice_head(next, ".so".as_bytes());
+    let soname = unsafe { cstr_from_ptr(soname.as_ptr().cast()) };
     let mut var_name = [0u8; 96];
     let next = copy_to_slice_head(&mut var_name, "WL_SUBSYS_".as_bytes());
     let len = 96 - copy_to_slice_head(next, name.as_bytes()).len();
@@ -215,16 +220,16 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
     let fhdl = if let Some(var) = env::get_env(env_name) {
         if var.contains('/') {
             let fd = open_sysroot_rdonly(AT_FDCWD, var)
-                .unwrap_or_else(|_| RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound));
+                .unwrap_or_else(|_| RESOLVER.resolve_error(soname, Error::ObjectNotFound));
 
             core::ptr::without_provenance_mut(fd as usize)
         } else {
             let override_soname = env::get_cenv(env_name).expect("Expected an env var");
 
             unsafe {
-                LOADER.find(override_soname, udata).unwrap_or_else(|_| {
-                    RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound)
-                })
+                LOADER
+                    .find(override_soname, udata)
+                    .unwrap_or_else(|_| RESOLVER.resolve_error(soname, Error::ObjectNotFound))
             }
         }
     } else {
@@ -237,22 +242,19 @@ pub fn load_subsystem(name: &'static str, winter_soname: &'static CStr) -> &'sta
         unsafe {
             LOADER
                 .find(soname, udata)
-                .unwrap_or_else(|_| RESOLVER.resolve_error(winter_soname, Error::ObjectNotFound))
+                .unwrap_or_else(|_| RESOLVER.resolve_error(soname, Error::ObjectNotFound))
         }
     };
 
-    let ret = unsafe { RESOLVER.load_from_handle(Some(winter_soname), udata, fhdl) };
+    let ret = unsafe { RESOLVER.load_from_handle(Some(soname), udata, fhdl) };
     let _ = unsafe { syscall!(SYS_close, fhdl.addr() as i32) };
     drop(_guard);
     update_tls();
     ret
 }
 
-pub fn load_and_init_subsystem(
-    name: &'static str,
-    winter_soname: &'static CStr,
-) -> &'static DynEntry {
-    let ent = load_subsystem(name, winter_soname);
+pub fn load_and_init_subsystem(name: &str) -> &'static DynEntry {
+    let ent = load_subsystem(name);
 
     // eprintln!("Loaded libusi-{name}.so: {ent:#x?}");
 

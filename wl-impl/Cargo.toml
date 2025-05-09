@@ -27,7 +27,6 @@ allocator-api2 = { version = "0.2.21", default-features = false, features = [
 ] }
 paste = "1.0.15"
 rustix.workspace = true
-lock_api = "0.4.12"
 pooled-arena-malloc.workspace = true
 
 [lib]

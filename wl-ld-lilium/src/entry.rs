@@ -326,7 +326,7 @@ unsafe extern "C" fn __rust_entry(
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
-    let base = ldso::load_subsystem("base", c"libusi-base.so");
+    let base = ldso::load_subsystem("base");
 
     // eprintln!("Entries:");
     // eprintln!("{:#?}", RESOLVER.live_entries());
@@ -358,11 +358,11 @@ unsafe extern "C" fn __rust_entry(
     unsafe {
         base_init_subsystem();
     }
-    ldso::load_and_init_subsystem("thread", c"libusi-thread.so");
-    ldso::load_and_init_subsystem("io", c"libusi-io.so");
-    ldso::load_and_init_subsystem("process", c"libusi-process.so");
-    ldso::load_and_init_subsystem("debug", c"libusi-debug.so");
-    ldso::load_and_init_subsystem("kmgmt", c"libusi-kmgmt.so");
+    ldso::load_and_init_subsystem("thread");
+    ldso::load_and_init_subsystem("io");
+    ldso::load_and_init_subsystem("process");
+    ldso::load_and_init_subsystem("debug");
+    ldso::load_and_init_subsystem("kmgmt");
 
     let mut header: ElfHeader = bytemuck::zeroed();
 

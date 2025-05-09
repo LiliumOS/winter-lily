@@ -5,7 +5,6 @@ use core::{
 };
 
 use linux_raw_sys::general::{MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE};
-use lock_api::RawRwLock;
 use pooled_arena_malloc::pooled_alloc::PooledAlloc;
 use wl_helpers::{MmapAllocator, OnceLock};
 

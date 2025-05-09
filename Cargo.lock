@@ -777,7 +777,6 @@ dependencies = [
  "linux-errno",
  "linux-raw-sys 0.9.4",
  "linux-syscall",
- "lock_api",
  "memchr",
  "paste",
  "pooled-arena-malloc",
