@@ -116,7 +116,7 @@ pub unsafe fn copy_nonoverlapping_checked<T>(
     let mut err = CheckedAccessError::zeroed();
 
     if unsafe {
-        rt_impls::checked_memcpy_impl(
+        rt_impls::__checked_memcpy_impl(
             dest.cast(),
             src.cast(),
             elems * core::mem::size_of::<T>(),

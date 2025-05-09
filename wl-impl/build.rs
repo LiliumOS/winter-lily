@@ -70,6 +70,10 @@ fn main() {
     let file = format!("c/signal_support/{}.c", arch);
 
     println!("cargo::rerun-if-changed={file}");
+    println!(
+        "cargo::rustc-link-search=native={}",
+        std::env::var("OUT_DIR").unwrap()
+    );
 
     cc::Build::new()
         .file(file)
