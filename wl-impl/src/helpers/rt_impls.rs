@@ -1,3 +1,5 @@
+use core::arch::global_asm;
+
 use crate::helpers::CheckedAccessError;
 
 unsafe extern "C" {
@@ -8,4 +10,11 @@ unsafe extern "C" {
         err: &mut CheckedAccessError,
     ) -> isize;
     pub unsafe fn __install_sa_handler();
+}
+
+global_asm! {
+    ".protected {__checked_memcpy_impl}",
+    ".protected {__install_sa_handler}",
+    __install_sa_handler = sym __install_sa_handler,
+    __checked_memcpy_impl = sym __checked_memcpy_impl,
 }
