@@ -95,6 +95,7 @@ fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'sta
         copy_to_slice_head(&mut buf[pos..], v.as_bytes());
     }
     if let Ok(fd) = open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, config_path) {
+        debug("init_cache_slow(read)", config_path.as_bytes());
         read_config_file(fd, &mut buf)?;
     }
 
@@ -152,13 +153,16 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
         }
         vbuf[0] = 0;
 
-        let bname = unsafe { cstr_from_ptr(buf.as_ptr().cast()) };
+        let excess_len = vbuf.len();
 
-        let fd = unsafe { syscall!(SYS_open, buf.as_ptr(), linux_raw_sys::general::O_RDONLY) };
+        let len = buf.len() - excess_len;
 
-        match fd.check() {
-            Ok(()) => {
-                let fd = fd.as_u64_unchecked() as i32;
+        let fname = unsafe { core::str::from_utf8_unchecked(&buf[..len]) };
+
+        let fd = open_sysroot_rdonly(AT_FDCWD, fname);
+
+        match fd {
+            Ok(fd) => {
                 let mut header = bytemuck::zeroed::<ElfHeader<ElfHost>>();
 
                 let mut rd = BufFdReader::new(fd);
@@ -233,7 +237,7 @@ pub fn load_subsystem(name: &str) -> &'static DynEntry {
             }
         }
     } else {
-        let next = copy_to_slice_head(&mut var_name, "libwl-lilium-".as_bytes());
+        let next = copy_to_slice_head(&mut var_name, "libwl-usi-".as_bytes());
         let next = copy_to_slice_head(next, name.as_bytes());
         copy_to_slice_head(next, ".so".as_bytes());
 

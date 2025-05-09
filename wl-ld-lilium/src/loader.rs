@@ -49,19 +49,6 @@ impl LoaderImpl for FdLoader {
                     // default subsystem, preloaded before any lilium code is loaded
                     return Err(Error::AssumePresent);
                 }
-                b"libusi-rtld.so" | b"libusi-unwind.so" | b"libusi-vti.so" | b"libc.so"
-                | b"libdl.so" => {
-                    let redirect_name = match soname.to_bytes() {
-                        b"libusi-rtld.so" => c"libwl-usi-rtld.so",
-                        b"libusi-unwind.so" => c"libwl-usi-unwind.so",
-                        b"libusi-vti.so" => c"libwl-usi-vti.so",
-                        b"libc.so" => c"libwl-usi-posix.so",
-                        b"libdl.so" => c"libwl-usi-dl.so",
-                        _ => todo!(),
-                    };
-
-                    (SearchType::Host, redirect_name)
-                }
                 _ => (search, soname),
             }
         } else {

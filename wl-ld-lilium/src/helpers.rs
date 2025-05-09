@@ -414,7 +414,7 @@ pub fn debug(src: &str, buf: &[u8]) {
 static SYSROOT_FD: OnceLock<i32> = OnceLock::new();
 
 pub fn open_sysroot_rdonly(mut at_fd: i32, st: &str) -> crate::io::Result<i32> {
-    debug("open_rdonly", st.as_bytes());
+    debug("open_sysroot_rdonly", st.as_bytes());
     let mut path = safe_zeroed::<[u8; 256]>();
     copy_to_slice_head(&mut path, st.as_bytes())[0] = 0;
 
