@@ -1,7 +1,6 @@
 #![feature(
     thread_local,
     string_from_utf8_lossy_owned,
-    naked_functions,
     never_type,
     nonzero_ops,
     exact_size_is_empty,
@@ -10,7 +9,6 @@
     iter_advance_by,
     allocator_api,
     alloc_layout_extra,
-    inline_const_pat,
     once_cell_try
 )]
 #![no_std]

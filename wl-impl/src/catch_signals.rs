@@ -38,7 +38,7 @@ global_asm! {
 }
 
 #[cfg(target_arch = "x86_64")]
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn invoke_syscall_uctx(uctx: *mut mcontext_t) {
     use crate::libc::{REG_R8, REG_R9, REG_R10, REG_RAX, REG_RDI, REG_RDX, REG_RSI};
 

@@ -50,7 +50,7 @@ core::arch::global_asm! {
     MMAP_FLAGS = const const { linux_raw_sys::general::MAP_PRIVATE | linux_raw_sys::general::MAP_ANONYMOUS | linux_raw_sys::general::MAP_GROWSDOWN | linux_raw_sys::general::MAP_STACK }
 }
 
-#[naked]
+#[unsafe(naked)]
 pub unsafe extern "sysv64" fn __call_entry_point(
     argc: usize,            /* rdi */
     argv: *mut *mut c_char, /* rsi */

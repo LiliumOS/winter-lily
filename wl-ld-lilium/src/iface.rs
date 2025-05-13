@@ -16,7 +16,7 @@ pub struct TlsDesc {
 }
 
 #[cfg(target_arch = "x86_64")]
-#[naked]
+#[unsafe(naked)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
     unsafe {

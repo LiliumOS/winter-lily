@@ -15,7 +15,7 @@ struct jmp_buf {
 }
 
 #[unsafe(no_mangle)]
-#[naked]
+#[unsafe(naked)]
 #[cfg(target_arch = "x86_64")]
 unsafe extern "C" fn __setjmp(buf: *mut jmp_buf) -> i32 {
     unsafe {
@@ -39,7 +39,7 @@ unsafe extern "C" fn __setjmp(buf: *mut jmp_buf) -> i32 {
 }
 
 #[unsafe(no_mangle)]
-#[naked]
+#[unsafe(naked)]
 #[cfg(target_arch = "x86_64")]
 unsafe extern "C-unwind" fn longjmp(buf: *mut jmp_buf, status: i32) -> ! {
     unsafe {
@@ -136,7 +136,7 @@ global_asm! {
     sigaction = sym sigaction
 }
 
-#[naked]
+#[unsafe(naked)]
 #[cfg(target_arch = "x86_64")]
 unsafe extern "C" fn impl_restorer() {
     unsafe {
