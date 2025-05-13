@@ -34,7 +34,7 @@ use core::arch::naked_asm;
 use lilium_sys::sys::result::errors::UNSUPPORTED_KERNEL_FUNCTION;
 
 #[cfg(target_arch = "x86_64")]
-#[naked]
+#[unsafe(naked)]
 pub(crate) unsafe extern "sysv64" fn __handle_syscall(_: Infallible) -> SysResult {
     unsafe {
         naked_asm! {
