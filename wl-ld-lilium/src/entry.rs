@@ -25,7 +25,7 @@ use crate::helpers::{
     FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly, rand::Gen,
 };
 use crate::helpers::{pread_exact, udata};
-use crate::loader::{LOADER, TLS_MC, Tcb, set_tp, setup_tls_mc};
+use crate::loader::{LOADER, TLS_MC, Tcb, set_tp, setup_tls_mc, update_tls};
 use crate::{env::__ENV, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
@@ -325,6 +325,9 @@ unsafe extern "C" fn __rust_entry(
     unsafe { (&mut *WL_RESOLVER.as_ptr()).force_resolve_now() };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *WL_RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
+    unsafe {
+        (&mut *WL_RESOLVER.as_ptr()).delegate(&RESOLVER);
+    }
 
     let base = ldso::load_subsystem("base");
 
@@ -371,6 +374,7 @@ unsafe extern "C" fn __rust_entry(
             None,
             udata(SearchType::Winter as usize),
             udata(execfd as usize),
+            true,
         )
     };
 
@@ -380,6 +384,8 @@ unsafe extern "C" fn __rust_entry(
     let entry = unsafe { binary.base.add(header.e_entry as usize) };
 
     eprintln!("Found _start {entry:p}");
+
+    update_tls();
 
     __setup_auxv(auxv, entry, argv, argc, envp, envpc, &mut rand)
 }

@@ -247,55 +247,63 @@ impl LoaderImpl for FdLoader {
         let _ = unsafe { syscall!(SYS_close, hdl.addr() as i32) };
     }
 
-    fn alloc_tls(&self, tls_size: usize, tls_align: usize) -> Result<usize, Error> {
-        let val = self
-            .tls_off
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
-                let next = (v + (tls_align - 1)) & !(v + (tls_align - 1)) + tls_size;
-                if next > (TLS_BLOCK_SIZE >> 1) {
-                    return None;
-                } else {
-                    return Some(next);
-                }
-            })
-            .map_err(|_| Error::AllocError)?;
+    fn alloc_tls(&self, tls_size: usize, tls_align: usize, exec_tls: bool) -> Result<isize, Error> {
+        let val = if exec_tls {
+            self.tls_off
+                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
+                    let next = (v + (tls_align - 1)) & !(v + (tls_align - 1)) + tls_size;
+                    if next > (TLS_BLOCK_SIZE >> 1) {
+                        return None;
+                    } else {
+                        return Some(next);
+                    }
+                })
+                .map_err(|_| Error::AllocError)? as isize
+        } else {
+            (-(tls_size as isize)) & !(tls_align as isize - 1)
+        };
 
-        let aligned_val = (val + (tls_align - 1)) & !(tls_align - 1);
+        let aligned_val = (val + (tls_align as isize - 1)) & !(tls_align as isize - 1);
 
-        let pg = TLS_MC.0.map_addr(|a| a + (val & !4095));
+        let pg = TLS_MC.0.map_addr(|a| a.wrapping_add_signed(val & !4095));
 
         let res = unsafe {
             syscall!(
                 SYS_mprotect,
                 pg,
-                tls_size + (aligned_val - (val & !4095)),
+                tls_size as isize + (aligned_val - (val & !4095)),
                 PROT_READ | PROT_WRITE
             )
         };
-
-        unsafe {
-            (*get_master_tcb()).load_size += tls_size + (aligned_val - val);
-        }
-
         res.check().map_err(|_| Error::AllocError)?;
-        Ok(aligned_val)
+        if !exec_tls {
+            unsafe {
+                (*get_master_tcb()).load_size += tls_size.wrapping_add_signed(aligned_val - val);
+            }
+            Ok(aligned_val)
+        } else {
+            eprintln!("TLS Size: {aligned_val}");
+            unsafe {
+                (*get_master_tcb()).dyn_size = (-aligned_val) as usize;
+            }
+            Ok(aligned_val)
+        }
     }
 
-    fn tls_direct_offset(&self, module: usize) -> Result<usize, Error> {
+    fn tls_direct_offset(&self, module: isize) -> Result<isize, Error> {
         Ok(module) // every module is valid for offset
     }
 
     fn load_tls(
         &self,
-        tls_module: usize,
+        tls_module: isize,
         desc: *mut c_void,
         off: ElfOffset,
         sz: ElfSize,
     ) -> Result<(), Error> {
-        // TODO: Load Master Copy and mark as dirty for other threads
         let tp = TLS_MC.0;
 
-        let module = tp.wrapping_add(tls_module);
+        let module = tp.wrapping_offset(tls_module);
 
         let sl = unsafe { core::slice::from_raw_parts_mut(module.cast::<u8>(), sz as usize) };
 
@@ -311,6 +319,7 @@ pub fn get_master_tcb() -> *mut Tcb {
 }
 
 #[repr(C, align(32))]
+#[derive(Debug)]
 pub struct Tcb {
     tls_base: *mut c_void,
     pub load_size: usize,
@@ -333,7 +342,7 @@ pub unsafe fn setup_tls_mc(tls_mc: *mut c_void) {
     }
     unsafe {
         get_master_tcb().write(Tcb {
-            tls_base: core::ptr::null_mut(),
+            tls_base: tls_mc,
             load_size: core::mem::size_of::<Tcb>(),
             dyn_size: 0,
         })
@@ -342,24 +351,22 @@ pub unsafe fn setup_tls_mc(tls_mc: *mut c_void) {
 
 pub fn update_tls() {
     let _guard = LOAD_LOCK.read();
+
     let tp = get_tp();
     let tlsmc = TLS_MC.0;
     let tcb = unsafe { &mut *(tp.cast::<Tcb>()) };
     let mtcb = unsafe { &*tlsmc.cast::<Tcb>() };
+    eprintln!("MTCB before update_tls: {mtcb:?} (thread {tcb:?})");
     if tcb.load_size < mtcb.load_size {
         let len = mtcb.load_size - tcb.load_size;
         let pg = tp.map_addr(|a| a + (tcb.load_size & !4095));
-        let res = unsafe {
-            syscall!(
-                SYS_mprotect,
-                pg,
-                mtcb.load_size - (tcb.load_size & !4095),
-                PROT_READ | PROT_WRITE
-            )
-        };
+        let map_len = mtcb.load_size - (tcb.load_size & !4095);
+        eprintln!("new map base ptr: {pg:p}");
+        eprintln!("new map len: {map_len}");
+        let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
 
         if let Err(e) = res.check() {
-            eprintln!("TCB Update failed: {e:?}");
+            eprintln!("TCB Update (stls) failed: {e:?}");
             crash_unrecoverably()
         }
 
@@ -368,6 +375,26 @@ pub fn update_tls() {
         }
         tcb.load_size = mtcb.load_size;
     }
+
+    if tcb.dyn_size < mtcb.dyn_size {
+        let len = mtcb.dyn_size - tcb.dyn_size;
+        let pg = tp.map_addr(|a| a - (mtcb.dyn_size & !4095));
+        let map_len = ((mtcb.dyn_size + 4095) & !4095) - tcb.dyn_size;
+        eprintln!("new map base ptr: {pg:p}");
+        eprintln!("new map length: {map_len}");
+        let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
+
+        if let Err(e) = res.check() {
+            eprintln!("TCB Update (dtls) failed: {e:?}");
+            crash_unrecoverably()
+        }
+
+        unsafe {
+            core::ptr::copy_nonoverlapping(tlsmc.sub(mtcb.dyn_size), tp.sub(mtcb.dyn_size), len);
+        }
+    }
+
+    eprintln!("TCB after update_tls: {tcb:?}");
 }
 
 pub fn set_tp(ptr: *mut c_void) {

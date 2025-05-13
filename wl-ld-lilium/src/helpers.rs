@@ -261,7 +261,11 @@ pub unsafe extern "C" fn memset(ptr: *mut u8, b: i32, len: usize) -> *mut u8 {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, len: usize) -> *mut u8 {
+pub unsafe extern "C" fn memmove(
+    dest: *mut MaybeUninit<u8>,
+    src: *const MaybeUninit<u8>,
+    len: usize,
+) -> *mut MaybeUninit<u8> {
     for i in 0..len {
         unsafe { dest.add(i).write(src.add(i).read()) }
     }
@@ -269,7 +273,11 @@ pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, len: usize) -> *
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, len: usize) -> *mut u8 {
+pub unsafe extern "C" fn memcpy(
+    dest: *mut MaybeUninit<u8>,
+    src: *const MaybeUninit<u8>,
+    len: usize,
+) -> *mut MaybeUninit<u8> {
     for i in 0..len {
         unsafe { dest.add(i).write(src.add(i).read()) }
     }

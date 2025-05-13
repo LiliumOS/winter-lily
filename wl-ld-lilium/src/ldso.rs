@@ -250,7 +250,7 @@ pub fn load_subsystem(name: &str) -> &'static DynEntry {
         }
     };
 
-    let ret = unsafe { RESOLVER.load_from_handle(Some(soname), udata, fhdl) };
+    let ret = unsafe { RESOLVER.load_from_handle(None, udata, fhdl, false) };
     let _ = unsafe { syscall!(SYS_close, fhdl.addr() as i32) };
     drop(_guard);
     update_tls();
