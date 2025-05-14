@@ -248,10 +248,10 @@ impl LoaderImpl for FdLoader {
     }
 
     fn alloc_tls(&self, tls_size: usize, tls_align: usize, exec_tls: bool) -> Result<isize, Error> {
-        let val = if exec_tls {
+        let val = if !exec_tls {
             self.tls_off
                 .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| {
-                    let next = (v + (tls_align - 1)) & !(v + (tls_align - 1)) + tls_size;
+                    let next = ((v + (tls_align - 1)) & !(tls_align - 1)) + tls_size;
                     if next > (TLS_BLOCK_SIZE >> 1) {
                         return None;
                     } else {
@@ -265,16 +265,14 @@ impl LoaderImpl for FdLoader {
 
         let aligned_val = (val + (tls_align as isize - 1)) & !(tls_align as isize - 1);
 
-        let pg = TLS_MC.0.map_addr(|a| a.wrapping_add_signed(val & !4095));
+        eprintln!("TLS offset {val:-} (aligned: {aligned_val:-})");
 
-        let res = unsafe {
-            syscall!(
-                SYS_mprotect,
-                pg,
-                tls_size as isize + (aligned_val - (val & !4095)),
-                PROT_READ | PROT_WRITE
-            )
-        };
+        let pg = TLS_MC.0.map_addr(|a| a.wrapping_add_signed(val & !4095));
+        let map_len = tls_size as isize + (aligned_val - (val & !4095));
+
+        eprintln!("Alloc TLS map({pg:p}, {map_len})");
+
+        let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
         res.check().map_err(|_| Error::AllocError)?;
         if !exec_tls {
             unsafe {
@@ -378,7 +376,7 @@ pub fn update_tls() {
 
     if tcb.dyn_size < mtcb.dyn_size {
         let len = mtcb.dyn_size - tcb.dyn_size;
-        let pg = tp.map_addr(|a| a - (mtcb.dyn_size & !4095));
+        let pg = tp.map_addr(|a| a - ((mtcb.dyn_size + 4095) & !4095));
         let map_len = ((mtcb.dyn_size + 4095) & !4095) - tcb.dyn_size;
         eprintln!("new map base ptr: {pg:p}");
         eprintln!("new map length: {map_len}");
@@ -392,6 +390,7 @@ pub fn update_tls() {
         unsafe {
             core::ptr::copy_nonoverlapping(tlsmc.sub(mtcb.dyn_size), tp.sub(mtcb.dyn_size), len);
         }
+        tcb.dyn_size = mtcb.dyn_size;
     }
 
     eprintln!("TCB after update_tls: {tcb:?}");

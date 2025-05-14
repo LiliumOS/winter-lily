@@ -97,7 +97,11 @@ pub unsafe extern "sysv64" fn __call_entry_point(
             "2:",
             "push rdi",
             "mov rax, 1",
-            "jmp r10"
+            "lea rdx, [{_local_fini}+rip]",
+            "jmp r10",
+            _local_fini = sym _local_fini
         }
     }
 }
+
+extern "C" fn _local_fini() {}
