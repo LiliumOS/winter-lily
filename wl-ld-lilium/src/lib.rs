@@ -8,7 +8,6 @@
     try_trait_v2_residual,
     allocator_api,
     alloc_layout_extra,
-    naked_functions,
     strict_provenance_atomic_ptr
 )]
 

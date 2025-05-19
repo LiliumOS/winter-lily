@@ -1,0 +1,12 @@
+use types;
+
+
+/// Provides information about the native platform (typically gathered from `uname(2)`)
+struct SysInfoOptionWlNativePlatform option(U{1719e373-21ed-5423-b2d8-5eed28f27587}) {
+    /// The name of the Native Platform (usually the kernel)
+    native_sys: KStrCPtr,
+    /// The release of the native platform
+    native_release: KStrCPtr,
+    /// The version of the native platform
+    native_version: KStrCPtr,
+}

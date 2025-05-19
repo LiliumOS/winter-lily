@@ -1,0 +1,4 @@
+use types::int;
+
+/// Placeholder. Returned from winter-lily if any system call results in a linux error that is not handled.
+pub ERROR_UNKNOWN_LINUX: i32 = 0;

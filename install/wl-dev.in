@@ -1,0 +1,6 @@
+if [ -z "${WL_SYSROOT+x}" ]
+then
+    export WL_SYSROOT="%_sysroot%"
+fi
+export LD_LIBRARY_PATH="$WL_SYSROOT%_host_libdir%:$WL_SYSROOT/toolchain/lib:$LD_LIBRARY_PATH"
+

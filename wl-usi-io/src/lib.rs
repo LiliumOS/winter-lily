@@ -23,3 +23,5 @@ unsafe extern "C" fn init_subsystem() {
 mod basic;
 
 mod poll;
+
+mod dev;

@@ -175,12 +175,75 @@ unsafe extern "C" fn __rust_entry(
             .map(|&ptr| unsafe { CStr::from_ptr(ptr) })
             .inspect(|v| debug("visit_argv", v.to_bytes()));
 
-        let mut argv0_override = None;
+        let mut argv0_override = core::ptr::null_mut();
 
         while let Some(arg) = args.next() {
             match core::str::from_utf8(arg.to_bytes()) {
                 Ok("--help") => {
                     println!("Usage: {prg_name} {USAGE_TAIL}");
+                    println!(
+                        "Usage: [binary name] [args...] (requires having the sysroot be the root directory)"
+                    );
+                    println!();
+                    println!(
+                        "Entry point for winter-lily - allows executing most Lilium Programs on Linux"
+                    );
+                    println!("Options:");
+                    println!("\t--help: Print this message and exit");
+                    println!("\t--version: Print version information and exit");
+                    println!(
+                        "\t--argv0 [name]: Report <name> (instead of <binary name>) as argv0 passed to the process"
+                    );
+                    println!(
+                        "\t--preload-lilium <module>: Causes <module> to be loaded as a Lilium library before the program or any library in the context of Lilium code."
+                    );
+                    println!(
+                        "\t\t<module> is either a library name (looked up in the lilium search path) or a path to a library."
+                    );
+                    println!(
+                        "\t--preload-native <module>, --preload-subsys <module>: Causes <module> to be loaded as a native library before any library other than ld.so."
+                    );
+                    println!(
+                        "\t\t<module> is either a library name (looked up in the native search path) or a path to a library."
+                    );
+                    println!(
+                        "\t\t--preload-subsys differs from --preload-native in that, after the library is loaded, a symbol named {} is found and executed.",
+                        wl_init_subsystem_name!()
+                    );
+                    println!();
+                    println!("Environment Variables:");
+                    println!(
+                        "\tLD_LIBRARY_PATH_WL_LILIUM: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for lilium libraries"
+                    );
+                    println!(
+                        "\tLD_LIBRARY_PATH_WL_NATIVE: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for native libraries"
+                    );
+                    println!(
+                        "\tWL_SYSROOT: Treats absolute paths used to lookup libraries and configuration files as if they are prefixed by the path in this string"
+                    );
+                    println!(
+                        "\tWL_NATIVE_LD_SO_CONF: Look in this file, instead of /etc/ld.so.conf, for the paths to search for native libraries"
+                    );
+                    println!(
+                        "\tWL_LILIUM_LD_SO_CONF: Look in this file, instead of /etc/ld-lilium.so.conf, for paths to search for lilium libraries"
+                    );
+                    println!(
+                        "\tWL_SUBSYS_<name>: Specifies an **absolute path** to use when loading the subsystem with name <name>."
+                    );
+                    println!();
+                    println!("Secure Mode:");
+                    println!(
+                        "\tLinux and ld.so support something called Secure Mode, which is used when running programs with higher capabilities or with setuid"
+                    );
+                    println!(
+                        "\tProperly supporting Secure Mode requires adjusting substantial party of the behaviour of {prg_name}."
+                    );
+                    println!(
+                        "\tFor simplicitly and security, Secure Mode support is not implemented for winter-lily programs."
+                    );
+                    println!(
+                        "\tIf a Lilium program is run in Secure Mode (according to the `AT_SECURE` auxv entry), {prg_name} will print an error message and exit immediately"
+                    );
                     return 0;
                 }
                 Ok("--version") => {
@@ -197,7 +260,7 @@ unsafe extern "C" fn __rust_entry(
                 Ok("--argv0") => {
                     let ptr = unsafe { argv.add(1).read() };
 
-                    argv0_override = Some(ptr);
+                    argv0_override = ptr;
 
                     argv = unsafe { argv.add(2) };
                 }
@@ -240,6 +303,12 @@ unsafe extern "C" fn __rust_entry(
         } else {
             eprintln!("Usage: {prg_name} {USAGE_TAIL}");
             return 1;
+        }
+
+        if !argv0_override.is_null() {
+            unsafe {
+                *argv = argv0_override;
+            }
         }
     }
 

@@ -1,0 +1,13 @@
+use types;
+
+/// Runs the specified code address as native code
+/// The function is expected to have signature `fn(*mut void)->SysResult` according to the Sys-V convention for the host platform.
+/// The result is exactly the value returned by the function.
+///
+/// It is valid to unwind out of the function only if winter-lily is built with internal unwinding support. 
+///
+/// ## Errors
+/// If exec_addr cannot be executed, the function will either return `INVALID_MEMORY` or cause an apropriate `MemoryAccessBoundsViolation` error.
+///
+fn WlExecuteNative(exec_addr: *const void, udata: *mut void) -> SysResult = 0;
+

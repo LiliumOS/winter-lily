@@ -24,10 +24,10 @@ use core::ffi::c_void;
 #[repr(C, align(32))]
 #[derive(bytemuck::Zeroable)]
 pub struct Handle {
-    ty: usize,
-    blob1: *mut c_void,
-    blob2: *mut c_void,
-    fd: c_long,
+    pub ty: usize,
+    pub blob1: *mut c_void,
+    pub blob2: *mut c_void,
+    pub fd: c_long,
 }
 
 #[thread_local]
@@ -83,6 +83,14 @@ impl Handle {
     pub fn borrow_fd(&self) -> Option<BorrowedFd> {
         if self.fd >= 0 {
             Some(unsafe { BorrowedFd::borrow_raw(self.fd as i32) })
+        } else {
+            None
+        }
+    }
+
+    pub fn borrow_fd2(&self) -> Option<BorrowedFd> {
+        if (self.blob2.addr() as isize) < 0 {
+            Some(unsafe { BorrowedFd::borrow_raw(-(self.blob2.addr() as i32)) })
         } else {
             None
         }

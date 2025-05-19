@@ -1,5 +1,5 @@
-#!/bin/sh
+#!/bin/bash
 
-WL_SYSROOT="$(realpath "$(dirname "$(command -v winter-lily)")/..")"
+WL_SYSROOT="$(realpath "$(dirname "$(command -v $0)")/..")"
 
-WL_SYSROOT="$WL_SYSROOT" exec "$WL_SYSROOT/lib/ld-lilium-%ARCH%.so.1" "$@"
+WL_SYSROOT="$WL_SYSROOT" exec -a "$0" "$WL_SYSROOT/lib/ld-lilium-%ARCH%.so.1" "$@"

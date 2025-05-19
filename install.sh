@@ -92,6 +92,12 @@ do
             syslibdir="$2"
             shift 2
         ;;
+        --datadir)
+            datadir="$2"
+            ;;
+        --datarootdir)
+            datarootdir="$2"
+            ;;
         --sysroot)
             sysroot="$2"
             shift 2
@@ -197,6 +203,22 @@ esac
 
 _syslibdir="$(echo "$_syslibdir" | sed -e "s|//\+|/|g")"
 
+case "${datarootdir}" in
+    [/\\*])
+        _datarootdir="${datarootdir}"
+        ;;
+    *)  _datarootdir="${_prefix}/${datarootdir:-share}"
+        ;;
+esac 
+
+case "${datadir}" in
+    [/\\*])
+        _datadir="${datadir}"
+        ;;
+    *)  _datadir="${_datarootdir}/${datadir}"
+        ;;
+esac
+
 case "${STRIP:-no}" in
     1|y|yes|true)
     _strip_opts="--strip"
@@ -262,6 +284,7 @@ libdir="$_libdir" host_libdir="$_host_libdir" install_template "${_sysconfdir}/l
 install_prg "${_syslibdir}/ld-lilium-$ARCH.so.1" "$CARGO_TARGET_DIR/$TARGET_LD/release/libwl_ld_lilium.so" || exit $?
 
 install_mode=755 install_template "${_bindir}/winter-lily" "${whereami}/install/winter-lily.in" ARCH || exit $?
+install_template "${_datarootdir}/wl-dev" "${whereami}/install/wl-dev.in" _sysroot _host_libdir || exit $?
 
 install_lib "${_host_libdir}/libwl_impl.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_impl.so" || exit $?
 for subsys in $(cat ${whereami}/subsysnames)

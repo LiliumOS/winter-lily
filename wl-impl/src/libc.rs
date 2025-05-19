@@ -101,3 +101,14 @@ pub fn siginfo(
 unsafe extern "C" {
     pub safe fn __rtld_get_thread_ptr() -> *mut c_void;
 }
+
+pub const PR_SET_SYSCALL_USER_DISPATCH: usize = 59;
+
+pub const PR_SYS_DISPATCH_OFF: usize = 0;
+pub const PR_SYS_DISPATCH_ON: usize = 1;
+
+// # define SYSCALL_DISPATCH_FILTER_ALLOW	0
+// # define SYSCALL_DISPATCH_FILTER_BLOCK	1
+
+pub const SYSCALL_DISPATCH_FILTER_ALLOW: u8 = 0;
+pub const SYSCALL_DISPATCH_FILTER_BLOCK: u8 = 1;
