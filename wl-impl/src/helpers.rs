@@ -13,7 +13,7 @@ use lilium_sys::{
         option::ExtendedOptionHead,
     },
 };
-use linux_errno::{EINTR, EPERM};
+use linux_errno::{EFAULT, EINTR, EINVAL, ENOMEM, ENOSYS, EPERM};
 use linux_raw_sys::general::{SIGKILL, SIGQUIT, sigaction, sigset_t};
 use linux_syscall::{SYS_getpid, SYS_kill, SYS_rt_sigaction, syscall};
 
@@ -649,6 +649,10 @@ pub fn linux_error_to_lilium(errno: linux_errno::Error) -> lilium_sys::result::E
     match errno {
         EINTR => lilium_sys::result::Error::Interrupted,
         EPERM => lilium_sys::result::Error::Permission,
+        ENOMEM => lilium_sys::result::Error::InsufficientMemory,
+        EINVAL => lilium_sys::result::Error::InvalidOperation,
+        EFAULT => lilium_sys::result::Error::InvalidMemory,
+        ENOSYS => lilium_sys::result::Error::UnsupportedKernelFunction,
         _ => lilium_sys::result::Error::from_code(-0x800).unwrap_err(), // Error 8:0 in winter-lily is the winter-lily unknown error
     }
 }

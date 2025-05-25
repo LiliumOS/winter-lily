@@ -10,6 +10,7 @@ then
     CFLAGS_MUSL="-O3"
 else 
     CFLAGS_MUSL="-O2 -g"
+    export WL_LD_DEBUG_DEFAULT="1"
 fi
 
 # echo "ARCH=$ARCH" > musl/config.mak

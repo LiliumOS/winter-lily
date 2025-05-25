@@ -9,7 +9,8 @@
     iter_advance_by,
     allocator_api,
     alloc_layout_extra,
-    once_cell_try
+    once_cell_try,
+    isolate_most_least_significant_one
 )]
 #![no_std]
 

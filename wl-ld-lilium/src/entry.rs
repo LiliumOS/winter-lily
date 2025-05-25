@@ -21,6 +21,7 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
+use crate::env;
 use crate::helpers::{
     FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly, rand::Gen,
 };
@@ -93,7 +94,6 @@ unsafe extern "C" fn __rust_entry(
 
     let mut execfd = -1;
 
-    unsafe { (&mut *RESOLVER.as_ptr()).force_resolve_now() }; // For now, config based off `LD_BIND_NOW` later 
     unsafe { (&mut *RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
@@ -154,7 +154,20 @@ unsafe extern "C" fn __rust_entry(
         .winter_base
         .store(lilium_base_addr, core::sync::atomic::Ordering::Relaxed);
 
-    println!("Hello world");
+    unsafe { RESOLVER.force_resolve_now() }; // For now, config based off `LD_BIND_NOW` later 
+
+    if let Some(n) = env::get_env("WL_LD_DEBUG")
+        .or_else(|| env::get_env("LD_DEBUG"))
+        .or(option_env!("WL_LD_DEBUG_DEFAULT"))
+    {
+        let dbg = n.parse().unwrap();
+        unsafe {
+            RESOLVER.set_debug(dbg);
+        }
+        unsafe {
+            WL_RESOLVER.set_debug(dbg);
+        }
+    }
 
     if execfd == !0 {
         if argc < 1 {

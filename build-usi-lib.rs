@@ -5,4 +5,6 @@ fn main() {
     println!("cargo::rerun-if-changed=../build-usi-lib.rs");
     println!("cargo::rustc-link-arg=-soname");
     println!("cargo::rustc-link-arg=libusi-{name}.so");
+    println!("cargo::rustc-link-arg=-rpath");
+    println!("cargo::rustc-link-arg=$ORIGIN");
 }
