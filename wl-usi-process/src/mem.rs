@@ -13,10 +13,10 @@ use wl_impl::{
 
 export_syscall! {
     unsafe extern fn CreateMapping(base_addr: *mut *mut c_void, page_count: isize, map_attrs: u32, map_kind: u32, _map_ext: *const KCSlice<sys::MapExtendedAttr>) -> Result<()> {
-        let hint_addr = unsafe { read_checked(base_addr)? };
+        let hint_addr = unsafe { base_addr.read() };
 
         let mut linux_prot = 0;
-        let mut linux_flags = 0;
+        let mut linux_flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
         if (map_attrs & !(sys::MAP_ATTR_READ | sys::MAP_ATTR_WRITE | sys::MAP_ATTR_EXEC | sys::MAP_ATTR_THREAD_PRIVATE | sys::MAP_ATTR_PROC_PRIVATE | sys::MAP_ATTR_RESERVE)) != 0 ||
             (map_kind != sys::MAP_KIND_NORMAL && map_kind != sys::MAP_KIND_RESIDENT && map_kind != sys::MAP_KIND_SECURE && map_kind != sys::MAP_KIND_ENCRYPTED) {
             return Err(Error::InvalidOperation)
@@ -49,7 +49,7 @@ export_syscall! {
 
         let ptr = unsafe { mmap(hint_addr, (page_count * 4095) as usize, linux_prot, linux_flags, -1, 0)}
             .map_err(linux_error_to_lilium)?;
-        unsafe { write_checked(base_addr, ptr)?; }
+        unsafe { core::ptr::write(base_addr, ptr); }
         Ok(())
     }
 }

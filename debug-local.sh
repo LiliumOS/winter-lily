@@ -26,5 +26,5 @@ then
     fi
     exec $GDB $GDBARGS target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
 else
-    exec $GDB $GDBARGS --args target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
+    exec $GDB $GDBARGS -x debug-winter.gdb --args target/x86_64-unknown-linux-none/${TARGET_PATH}/libwl_ld_lilium.so "$@"
 fi

@@ -21,8 +21,8 @@ long __checked_memcpy_impl(void *restrict _dest, const void *restrict _src, size
     jmp_buf _buf;
     if (setjmp(_buf))
     {
+        atomic_load_explicit(&CHECKED_ACCESS_ERROR, memory_order_acquire); // We know what store this locks to.
         atomic_store_explicit(&CHECKED_ACCESS_RETBUF, NULL, memory_order_relaxed);
-        atomic_load_explicit(&CHECKED_ACCESS_RETBUF, memory_order_acquire); // We know what store this locks to.
         return -1;
     }
     atomic_store_explicit(&CHECKED_ACCESS_ERROR, _acc, memory_order_relaxed);
