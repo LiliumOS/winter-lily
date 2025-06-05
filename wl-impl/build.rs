@@ -74,8 +74,8 @@ fn main() {
         "cargo::rustc-link-search=native={}",
         std::env::var("OUT_DIR").unwrap()
     );
-
-    cc::Build::new()
+    let mut build = cc::Build::new();
+    build
         .file(file)
         .std("c17")
         .pic(true)
@@ -84,6 +84,11 @@ fn main() {
         .flag("-ftls-model=initial-exec")
         .flag("-fvisibility=protected")
         .include("c/signal_support/include")
-        .include(format!("c/signal_support/include/{arch}/"))
-        .compile("signal_support");
+        .include(format!("c/signal_support/include/{arch}/"));
+
+    if arch == "x86_64" || arch.ends_with("86") {
+        build.flag("-masm=intel");
+    }
+
+    build.compile("signal_support");
 }

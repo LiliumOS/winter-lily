@@ -64,10 +64,15 @@ pub unsafe extern "sysv64" fn __call_entry_point(
         naked_asm! {
             "pop rax",
             "pop r10",
+            "mov r11, rdi",
+            "add r11, rcx",
+            "test r11, 1",
+            "je 2f",
             "push rax",
+            "2:",
             "shl rcx, 3",
             "shl r9, 4",
-            "push 0", //
+            "push 0", // alignment
             "push 0", // AT_END
             "sub rsp, r9",
             "2:",
@@ -75,7 +80,7 @@ pub unsafe extern "sysv64" fn __call_entry_point(
             "je 3f",
             "lea r9, [r9-16]",
             "movups xmm0, xmmword ptr [r8+r9]",
-            "movaps xmmword ptr [rsp+r9], xmm0",
+            "movups xmmword ptr [rsp+r9], xmm0",
             "jmp 2b",
             "3:",
             "mov rbx, rsp",
