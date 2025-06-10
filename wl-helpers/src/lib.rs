@@ -470,3 +470,5 @@ unsafe impl Allocator for MmapAllocator {
 pub mod rand;
 
 pub mod sync;
+
+pub mod detect;

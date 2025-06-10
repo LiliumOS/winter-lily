@@ -21,9 +21,8 @@ use wl_helpers::sync::RwLock;
 
 use crate::{
     entry::TLS_BLOCK_SIZE,
-    helpers::{FusedUnsafeCell, SyncPointer, debug},
+    helpers::{FusedUnsafeCell, SyncPointer, debug, is_x86_feature_detected},
     io::STDERR,
-    is_x86_feature_detected,
     ldso::{self, SearchType},
 };
 

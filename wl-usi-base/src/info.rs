@@ -19,7 +19,21 @@ static VERSION: LazyLock<Uuid> = LazyLock::new(|| {
 static ARCH_TYPE_VERSION: LazyLock<(Uuid, u32)> = LazyLock::new(|| {
     cfg_match::cfg_match! {
         target_arch = "x86_64"  => ({
-            (sys::arch_info::ARCH_TYPE_X86_64, 0)
+            let march_ver = if test_x86_features!("cmpxchg16b", "lahf_lm", "popcnt", "sse3", "sse4.1", "sse4.2", "ssse3") {
+                if test_x86_features!("avx", "avx2", "bmi1", "bmi2", "f16c", "fma", "abm", "movbe", "osxsave") {
+                    if test_x86_features!("avx512f", "avx512bw", "avx512cd", "avx512dq", "avx512vl") {
+                        4
+                    } else {
+                        3
+                    }
+                } else {
+                    2
+                }
+            } else {
+                1
+            };
+
+            (sys::arch_info::ARCH_TYPE_X86_64, march_ver)
         }),
         _ => ({
             core::compile_error!("Unexpected Target")
