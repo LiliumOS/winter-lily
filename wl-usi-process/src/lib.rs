@@ -1,10 +1,14 @@
 #![no_std]
 #![feature(never_type)]
 use exit::ExitProcess;
+use lilium_sys::uuid::parse_uuid;
 use mem::*;
 use wl_impl::{
-    erase, helpers::insert_elems, syscall_handler::register_subsys,
-    syscall_helpers::SysCallTyErased, wl_init_subsystem_name,
+    erase,
+    helpers::insert_elems,
+    syscall_handler::{SubsysInfo, register_subsys},
+    syscall_helpers::SysCallTyErased,
+    wl_init_subsystem_name,
 };
 
 static SYSCALLS: [Option<SysCallTyErased>; 4096] = insert_elems(
@@ -18,10 +22,17 @@ static SYSCALLS: [Option<SysCallTyErased>; 4096] = insert_elems(
     ],
 );
 
+static INFO: SubsysInfo = SubsysInfo {
+    name: "process",
+    uuid: parse_uuid("2bf86506-9b4a-5065-ac9e-ad6d21027460"),
+    subsys_version: 0,
+    max_sysno: 128,
+};
+
 #[unsafe(export_name = wl_init_subsystem_name!())]
 unsafe extern "C" fn init_subsystem() {
     unsafe {
-        register_subsys(3, &SYSCALLS);
+        register_subsys(3, &SYSCALLS, &INFO);
     }
 }
 

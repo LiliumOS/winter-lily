@@ -105,7 +105,7 @@ pub mod consts {
 
     pub const VERSION: &str = git_version::git_version!(
         prefix = ::core::concat!(::core::env!("CARGO_PKG_VERSION"), "-"),
-        cargo_suffix = "-packaged"
+        cargo_suffix = "packaged"
     );
 
     pub const KVENDOR_NAME: &str = core::env!("WL_VENDOR_NAME");

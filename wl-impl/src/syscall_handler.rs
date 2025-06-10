@@ -4,13 +4,28 @@ use core::{arch::global_asm, ffi::c_void, sync::atomic::AtomicPtr};
 use crate::syscall_helpers::SysCallTyErased;
 use core::convert::Infallible;
 use lilium_sys::sys::result::SysResult;
+use lilium_sys::uuid::Uuid;
+
+pub struct SubsysInfo {
+    pub name: &'static str,
+    pub uuid: Uuid,
+    pub subsys_version: u64,
+    pub max_sysno: u16,
+}
 
 static SYSCALL_SUBSYS_ARRAY: [AtomicPtr<[Option<SysCallTyErased>; 4096]>; 64] =
     [const { AtomicPtr::new(core::ptr::null_mut()) }; 64];
 
 static NEXT_DYN_SUBSYS: AtomicUsize = AtomicUsize::new(8);
 
-pub unsafe fn register_subsys(subsys: usize, arr: &'static [Option<SysCallTyErased>; 4096]) {
+static SUBSYS_REGISTRY: [AtomicPtr<SubsysInfo>; 64] =
+    [const { AtomicPtr::new(core::ptr::null_mut()) }; 64];
+
+pub unsafe fn register_subsys(
+    subsys: usize,
+    arr: &'static [Option<SysCallTyErased>; 4096],
+    info: &'static SubsysInfo,
+) {
     let subsys = if subsys == !0 {
         let val = NEXT_DYN_SUBSYS.fetch_add(1, Ordering::Relaxed);
         if val > SYSCALL_SUBSYS_ARRAY.len() {
@@ -23,10 +38,19 @@ pub unsafe fn register_subsys(subsys: usize, arr: &'static [Option<SysCallTyEras
     } else {
         subsys
     };
-    SYSCALL_SUBSYS_ARRAY[subsys].store(
-        core::ptr::from_ref(arr).cast_mut(),
-        core::sync::atomic::Ordering::Release,
-    )
+    core::sync::atomic::fence(Ordering::Release);
+    SYSCALL_SUBSYS_ARRAY[subsys].store(core::ptr::from_ref(arr).cast_mut(), Ordering::Relaxed);
+    SUBSYS_REGISTRY[subsys].store(core::ptr::from_ref(info).cast_mut(), Ordering::Relaxed);
+}
+
+pub fn all_subsystems() -> impl Iterator<Item = (u16, &'static SubsysInfo)> {
+    SUBSYS_REGISTRY
+        .iter()
+        .enumerate()
+        // SAFETY: we only store NULL or a reference from `register_subsys`, which is `'static`
+        .filter_map(|(num, r)| unsafe {
+            r.load(Ordering::Acquire).as_ref().map(|v| (num as u16, v))
+        })
 }
 
 use core::arch::naked_asm;
