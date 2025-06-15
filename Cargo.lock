@@ -835,6 +835,7 @@ dependencies = [
  "rustix 1.0.7",
  "wl-helpers",
  "wl-interface-map",
+ "wl-ld-lilium",
 ]
 
 [[package]]
@@ -917,5 +918,6 @@ dependencies = [
  "bytemuck",
  "lilium-sys",
  "linux-syscall",
+ "rustix 1.0.7",
  "wl-impl",
 ]

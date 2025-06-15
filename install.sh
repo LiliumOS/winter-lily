@@ -252,8 +252,8 @@ install_other(){
 }
 
 install_link() {
-    [ $_verbose -ne 0 ] && echo ln -sf "$2" "$1"
-    [ $_dry_run -eq 1 ] || ln -sf "$2" "$1" 
+    [ $_verbose -ne 0 ] && echo ln -sf "$2" "${_sysroot}$1"
+    [ $_dry_run -eq 1 ] || ln -sf "$2" "${_sysroot}$1" 
 }
 
 install_template() {
@@ -282,6 +282,18 @@ libdir="$_libdir" host_libdir="$_host_libdir" install_template "${_sysconfdir}/l
 # install_lib "${_host_libdir}/libc.so" "$PREFIX/lib/libc.so" || exit $?
 # install_lib "${_host_libdir}libgcc_s.so.1" "$PREFIX/$TARGET_RUST/$LIBTARG/libgcc_s.so.1" || exit $?
 install_prg "${_syslibdir}/ld-lilium-$ARCH.so.1" "$CARGO_TARGET_DIR/$TARGET_LD/release/libwl_ld_lilium.so" || exit $?
+
+_to_syslibdir=""
+
+_comp="$_libdir"
+
+while [ "$_comp" != "/" ]
+do
+    _comp="$(dirname "$_comp")"
+    _to_syslibdir="../${_to_syslibdir}"
+done
+
+install_link "${_libdir}/wl-ld-lilium-$ARCH.so" "${_to_syslibdir}${_syslibdir}/ld-lilium-$ARCH.so.1"
 
 install_mode=755 install_template "${_bindir}/winter-lily" "${whereami}/install/winter-lily.in" ARCH || exit $?
 install_template "${_datarootdir}/wl-dev" "${whereami}/install/wl-dev.in" _sysroot _host_libdir || exit $?

@@ -91,4 +91,8 @@ fn main() {
     }
 
     build.compile("signal_support");
+
+    let link_target_dir = std::env::var("LINK_TARGET_DIR").unwrap();
+    println!("cargo::rustc-link-search=native={link_target_dir}");
+    println!("cargo::rustc-link-lib=dylib=wl_ld_lilium");
 }

@@ -8,9 +8,11 @@ if [ "$RELEASE" != "" ]
 then
     CARGOFLAGS="--release"
     CFLAGS_MUSL="-O3"
+    TARG_DIR="release"
 else 
     CFLAGS_MUSL="-O2 -g"
     export WL_LD_DEBUG_DEFAULT="1"
+    TARG_DIR="debug"
 fi
 
 # echo "ARCH=$ARCH" > musl/config.mak
@@ -55,7 +57,7 @@ then
 # (cd wl-ld-lilium && cargo build -Z build-std="core,alloc" --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_LD") || exit $?
 
 echo "Building: wl host libraries"
-cargo build -Z build-std="core,alloc"  --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
+LINK_TARGET_DIR="$CARGO_TARGET_DIR/$TARGET_RUST/$TARG_DIR" cargo build -Z build-std="core,alloc"  --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
 
 mkdir -p "$PREFIX/etc"
 

@@ -9,6 +9,7 @@ wl-impl.workspace = true
 lilium-sys.workspace = true
 linux-syscall.workspace = true
 bytemuck.workspace = true
+rustix.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

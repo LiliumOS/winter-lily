@@ -28,6 +28,7 @@ allocator-api2 = { version = "0.2.21", default-features = false, features = [
 paste = "1.0.15"
 rustix.workspace = true
 pooled-arena-malloc.workspace = true
+wl-ld-lilium = { path = "../wl-ld-lilium" }
 
 [lib]
 crate-type = ["dylib"]

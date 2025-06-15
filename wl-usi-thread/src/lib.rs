@@ -1,4 +1,4 @@
-#![feature(never_type)]
+#![feature(never_type, pointer_is_aligned_to)]
 #![no_std]
 use lilium_sys::uuid::parse_uuid;
 use wl_impl::{
@@ -25,4 +25,5 @@ unsafe extern "C" fn init_subsystem() {
     }
 }
 
+mod event;
 mod exit;
