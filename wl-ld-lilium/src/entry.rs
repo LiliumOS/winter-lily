@@ -27,7 +27,7 @@ use crate::helpers::{
 };
 use crate::helpers::{pread_exact, udata};
 use crate::loader::{LOADER, TLS_MC, Tcb, set_tp, setup_tls_mc, update_tls};
-use crate::{env::__ENV, resolver};
+use crate::{env::__environ, resolver};
 
 use ld_so_impl::{safe_addr_of, safe_addr_of_mut};
 
@@ -36,6 +36,12 @@ const USAGE_TAIL: &str = "[OPTION]... <binary file> [args...]";
 const ARCH: &str = core::env!("ARCH");
 
 const MMAP_REGION_SIZE: usize = 4096 * 256;
+
+const NAME: &CStr = unsafe {
+    CStr::from_bytes_with_nul_unchecked(
+        core::concat!("wl-ld-lilium-", core::env!("ARCH"), ".so\0").as_bytes(),
+    )
+};
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
@@ -63,7 +69,12 @@ unsafe extern "C" fn __rust_entry(
         );
     }
     let envpc = unsafe { auxv.cast::<*mut c_char>().offset_from_unsigned(envp) };
-    unsafe { __ENV.as_ptr().write(crate::helpers::SyncPointer(envp)) }
+    unsafe {
+        safe_addr_of!(__environ)
+            .cast::<*mut *mut c_char>()
+            .cast_mut()
+            .write(envp)
+    }
     let base_addr = safe_addr_of_mut!(__base_addr);
 
     let end_addr = safe_addr_of!(__vaddr_end);
@@ -135,14 +146,7 @@ unsafe extern "C" fn __rust_entry(
     let arr = dyn_arr.as_slice();
 
     unsafe {
-        RESOLVER.resolve_object(
-            base_addr,
-            arr,
-            Some(c"ld-lilium-x86_64.so"),
-            core::ptr::null_mut(),
-            !0,
-            None,
-        );
+        RESOLVER.resolve_object(base_addr, arr, Some(NAME), core::ptr::null_mut(), !0, None);
     }
 
     let mut rand = Gen::seed(rand);

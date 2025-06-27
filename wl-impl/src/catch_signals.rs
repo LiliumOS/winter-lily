@@ -1,7 +1,7 @@
 use core::ffi::c_void;
 
 use lilium_sys::uuid::{Uuid, parse_uuid};
-use linux_raw_sys::general::{SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGSEGV, siginfo_t};
+use linux_raw_sys::general::{SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, siginfo_t};
 
 use core::arch::{global_asm, naked_asm};
 
@@ -9,14 +9,15 @@ use crate::libc::mcontext_t;
 
 use crate::{helpers::exit_unrecoverably, libc::ucontext_t, syscall_handler::__handle_syscall};
 
-fn sig_to_except(signo: u32) -> Uuid {
+pub fn sig_to_except(signo: u32) -> Option<Uuid> {
     match signo {
-        SIGABRT => const { parse_uuid("466fbae6-be8b-5525-bd04-ee7153b74f55") },
-        SIGBUS => const { parse_uuid("ef1d81bc-58d9-5779-a4c7-540b9163cdf1") },
-        SIGSEGV => const { parse_uuid("fcf8d451-89e6-50b5-b2e6-396aec58a74a") },
-        SIGILL => const { parse_uuid("9dc46cba-85a4-5b94-be24-03717a40c72b") },
-        SIGFPE => const { parse_uuid("5c91c672-f971-5b6b-a806-d6a6d2c8eb8a") },
-        _ => const { parse_uuid("79a90b8e-8f4b-5134-8aa2-ff68877017db") },
+        SIGABRT => Some(const { parse_uuid("466fbae6-be8b-5525-bd04-ee7153b74f55") }),
+        SIGBUS => Some(const { parse_uuid("ef1d81bc-58d9-5779-a4c7-540b9163cdf1") }),
+        SIGSEGV => Some(const { parse_uuid("fcf8d451-89e6-50b5-b2e6-396aec58a74a") }),
+        SIGILL => Some(const { parse_uuid("9dc46cba-85a4-5b94-be24-03717a40c72b") }),
+        SIGFPE => Some(const { parse_uuid("5c91c672-f971-5b6b-a806-d6a6d2c8eb8a") }),
+        SIGQUIT => None,
+        _ => Some(const { parse_uuid("79a90b8e-8f4b-5134-8aa2-ff68877017db") }),
     }
 }
 
@@ -29,7 +30,7 @@ unsafe extern "C" fn __sa_handler_seh_impl(signo: u32, siginfo: *mut siginfo_t, 
         return;
     }
 
-    exit_unrecoverably(Some(sig_to_except(signo)))
+    exit_unrecoverably(sig_to_except(signo))
 }
 
 global_asm! {

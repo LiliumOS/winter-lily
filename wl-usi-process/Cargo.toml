@@ -8,6 +8,8 @@ build = "../build-usi-lib.rs"
 wl-impl.workspace = true
 lilium-sys.workspace = true
 linux-syscall.workspace = true
+rustix.workspace = true
+bytemuck.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

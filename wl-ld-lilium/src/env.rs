@@ -1,4 +1,5 @@
 use core::{
+    arch::global_asm,
     ffi::{CStr, c_char},
     ptr::NonNull,
 };
@@ -7,13 +8,18 @@ use ld_so_impl::helpers::cstr_from_ptr;
 
 use crate::helpers::{FusedUnsafeCell, NullTerm, SplitAscii, SyncPointer, debug};
 
-pub static __ENV: FusedUnsafeCell<SyncPointer<*mut *mut c_char>> =
+#[unsafe(no_mangle)]
+pub static __environ: FusedUnsafeCell<SyncPointer<*mut *mut c_char>> =
     FusedUnsafeCell::new(SyncPointer::null_mut());
+
+global_asm! {
+    ".protected __environ",
+}
 
 pub fn get_env(var: &str) -> Option<&str> {
     debug("get_env", var.as_bytes());
     for ptr in
-        unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__ENV.0)?).copied() }
+        unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__environ.0)?).copied() }
     {
         let envst =
             unsafe { NullTerm::<u8>::from_ptr_unchecked(NonNull::new_unchecked(ptr.cast())) };
@@ -32,7 +38,7 @@ pub fn get_env(var: &str) -> Option<&str> {
 pub fn get_cenv(var: &str) -> Option<&CStr> {
     debug("get_env", var.as_bytes());
     for ptr in
-        unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__ENV.0)?).copied() }
+        unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__environ.0)?).copied() }
     {
         let envst =
             unsafe { NullTerm::<u8>::from_ptr_unchecked(NonNull::new_unchecked(ptr.cast())) };

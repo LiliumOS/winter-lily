@@ -10,6 +10,8 @@ lilium-sys.workspace = true
 linux-syscall.workspace = true
 bytemuck.workspace = true
 cordyceps = { version = "0.3.3", features = ["alloc"] }
+rustix.workspace = true
+linux-errno.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

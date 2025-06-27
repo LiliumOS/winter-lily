@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(never_type)]
+#![feature(never_type, unwrap_infallible)]
 use exit::ExitProcess;
 use lilium_sys::uuid::parse_uuid;
 use mem::*;
@@ -10,6 +10,8 @@ use wl_impl::{
     syscall_helpers::SysCallTyErased,
     wl_init_subsystem_name,
 };
+
+extern crate alloc;
 
 static SYSCALLS: [Option<SysCallTyErased>; 4096] = insert_elems(
     [None; 4096],
@@ -38,3 +40,4 @@ unsafe extern "C" fn init_subsystem() {
 
 mod exit;
 mod mem;
+mod proc;

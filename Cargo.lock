@@ -195,7 +195,7 @@ checksum = "d750af042f7ef4f724306de029d18836c26c1765a54a6a3f094cbd23a7267ffa"
 [[package]]
 name = "lilium-sys"
 version = "0.1.0"
-source = "git+https://github.com/LiliumOS/lilium-sys.git#5842f765d037d5daa6af8d2978555f5a91d48619"
+source = "git+https://github.com/LiliumOS/lilium-sys.git#ed6e2664487c466880af710cb9ec23e2e6b9ebcc"
 dependencies = [
  "bitflags",
  "bytemuck",
@@ -889,7 +889,9 @@ dependencies = [
  "bytemuck",
  "cordyceps",
  "lilium-sys",
+ "linux-errno",
  "linux-syscall",
+ "rustix 1.0.7",
  "wl-impl",
 ]
 
@@ -906,8 +908,10 @@ dependencies = [
 name = "wl-usi-process"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "lilium-sys",
  "linux-syscall",
+ "rustix 1.0.7",
  "wl-impl",
 ]
 

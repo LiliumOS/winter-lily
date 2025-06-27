@@ -44,6 +44,9 @@ def_syscall! {
     fn exit_group(v: i32) -> !;
     fn getpid() -> __kernel_pid_t;
     fn pidfd_open(pid: __kernel_pid_t, flags: c_uint) -> i32;
+
+    fn fork() -> i32;
+    fn execve(pathname: *const c_char, argv: *const *const c_char, envp: *const *const c_char) -> !;
 }
 
 pub trait FromSysVal {
