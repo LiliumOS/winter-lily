@@ -270,8 +270,9 @@ install_template() {
         _sed_args+=("-es!%${arg}%!${!arg}!g")
     done
 
-    [ $_verbose -gt 1 ] && echo "sed ${_sed_args[*]}"
+    [ $_verbose -gt 1 ] && echo "sed ${_sed_args[*]} > $_fname"
     cat "$_file" | sed "${_sed_args[@]}" > "$_fname" || return $?
+    [ $_verbose -gt 1 ] && echo  install -m${_mode} -D -T "$_fname" "${_sysroot}${_target}"
     [ $_dry_run -eq 1 ] || install -m${_mode} -D -T "$_fname" "${_sysroot}${_target}" || return $?
     [ $_save_temps -ne 1 ] && unlink "$_fname"
 }
@@ -296,7 +297,9 @@ done
 install_link "${_libdir}/wl-ld-lilium-$ARCH.so" "${_to_syslibdir}${_syslibdir}/ld-lilium-$ARCH.so.1"
 
 install_mode=755 install_template "${_bindir}/winter-lily" "${whereami}/install/winter-lily.in" ARCH || exit $?
-install_template "${_datarootdir}/wl-dev" "${whereami}/install/wl-dev.in" _sysroot _host_libdir || exit $?
+datadir="$_datadir" install_mode=755 install_template "${_bindir}/debug-winter" "${whereami}/install/debug-winter.in" ARCH datadir || exit $?
+install_other "${_datadir}/debug-winter.gdb" "${whereami}/debug-winter.gdb" || exit $?
+install_template "${_datadir}/wl-dev" "${whereami}/install/wl-dev.in" _sysroot _host_libdir || exit $?
 
 install_lib "${_host_libdir}/libwl_impl.so" "$CARGO_TARGET_DIR/$TARGET_RUST/release/libwl_impl.so" || exit $?
 for subsys in $(cat ${whereami}/subsysnames)

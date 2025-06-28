@@ -28,6 +28,8 @@ unsafe extern "C" fn __sa_handler_seh_impl(signo: u32, siginfo: *mut siginfo_t, 
             invoke_syscall_uctx(&raw mut (*uctx.cast::<ucontext_t>()).uc_mcontext);
         }
         return;
+    } else if signo == linux_raw_sys::general::SIGCHLD {
+        return;
     }
 
     exit_unrecoverably(sig_to_except(signo))

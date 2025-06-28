@@ -1,0 +1,5 @@
+#!/bin/bash
+
+WL_SYSROOT="$(realpath "$(dirname "$(command -v $0)")/..")"
+
+WL_SYSROOT="$WL_SYSROOT" exec gdb -x "$WL_SYSROOT%datadir%/debug-winter.gdb" --args "$WL_SYSROOT/lib/ld-lilium-%ARCH%.so.1" "$@"

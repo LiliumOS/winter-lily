@@ -52,7 +52,7 @@ static NATIVE_REGION_BASE: FusedUnsafeCell<SyncPointer<*const c_void>> =
     FusedUnsafeCell::new(SyncPointer::null());
 
 unsafe extern "C" fn __rust_entry(
-    argc: usize,
+    mut argc: usize,
     mut argv: *mut *mut c_char,
     envp: *mut *mut c_char,
     auxv: *mut AuxEnt,
@@ -190,7 +190,8 @@ unsafe extern "C" fn __rust_entry(
         let mut args = args
             .by_ref()
             .map(|&ptr| unsafe { CStr::from_ptr(ptr) })
-            .inspect(|v| debug("visit_argv", v.to_bytes()));
+            .inspect(|v| debug("visit_argv", v.to_bytes()))
+            .inspect(|_| argc -= 1);
 
         let mut argv0_override = core::ptr::null_mut();
 
@@ -291,6 +292,7 @@ unsafe extern "C" fn __rust_entry(
                     return 1;
                 }
                 Ok(_) | Err(_) => {
+                    argc += 1;
                     exec_name = Some(arg);
                     break;
                 }

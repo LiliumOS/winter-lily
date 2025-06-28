@@ -77,7 +77,7 @@ export_syscall! {
                     }
                 }
                 _ => {
-                    if (opt.head.flags & OPTION_FLAG_IGNORE) == 0 {
+                    if (unsafe { opt.head.flags } & OPTION_FLAG_IGNORE) == 0 {
                         return Err(LiliumError::InvalidOption)
                     }
                 }
@@ -98,6 +98,7 @@ export_syscall! {
         let mut buf = [const { MaybeUninit::uninit() }; 128];
         match unsafe { fork() } {
             Ok(0) => {
+                drop(read);
                 let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let msg = SendAncillaryMessage::ScmRights(&[fd.as_fd()]);
                 let mut buf = SendAncillaryBuffer::new(&mut buf);
