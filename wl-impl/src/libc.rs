@@ -3,7 +3,7 @@ pub use linux_raw_sys::general::*;
 
 pub type Result<T> = core::result::Result<T, Error>;
 
-pub use linux_errno::Error;
+pub use linux_errno::*;
 
 pub use linux_syscall::Result as Check;
 

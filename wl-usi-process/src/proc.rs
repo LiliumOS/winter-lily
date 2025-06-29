@@ -18,11 +18,12 @@ use rustix::{
 };
 use wl_impl::{
     catch_signals::sig_to_except,
-    export_syscall,
+    eprintln, export_syscall,
     handle_base::{Handle, insert_handle},
     helpers::{exit_unrecoverably, linux_error_to_lilium},
-    libc::{Error, execve, exit_group, fork},
+    libc::{EINVAL, Error, execve, exit_group, fork},
     ministd::AsRawFd,
+    println,
 };
 
 use lilium_sys::{
@@ -41,6 +42,9 @@ use lilium_sys::{
 unsafe extern "C" {
     safe static __environ: Cell<*const *const c_char>;
 }
+
+#[repr(C, align(16))]
+struct Align16<T>(T);
 
 export_syscall! {
     unsafe extern fn CreateProcess(hdl_out: *mut HandlePtr<ProcessHandle>, resolution_base: HandlePtr<FileHandle>, path: *const KStrCPtr, options: *const KCSlice<CreateProcessOption>) -> Result<()> {
@@ -95,15 +99,21 @@ export_syscall! {
 
         let (read, write) = rustix::net::socketpair(AddressFamily::UNIX, SocketType::STREAM, SocketFlags::CLOEXEC, None)
             .unwrap();
-        let mut buf = [const { MaybeUninit::uninit() }; 128];
+        const SPACE_NEEDED: usize = rustix::cmsg_space!(ScmRights(1));
+        let mut buf = Align16([const { MaybeUninit::uninit() }; SPACE_NEEDED]);
         match unsafe { fork() } {
             Ok(0) => {
                 drop(read);
-                let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
+                eprintln!("Entered Child");
+                let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { eprintln!("Opening pidfd failed"); let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let msg = SendAncillaryMessage::ScmRights(&[fd.as_fd()]);
-                let mut buf = SendAncillaryBuffer::new(&mut buf);
-                buf.push(msg);
-                sendmsg(&write, &[], &mut buf, SendFlags::DONTWAIT).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
+                let mut buf = SendAncillaryBuffer::new(&mut buf.0);
+                if !buf.push(msg) {
+                    eprintln!("Push to MSG_BUF failed");
+                    let _ = rustix::io::write(&write, bytemuck::bytes_of(&EINVAL.get()));
+                    exit_unrecoverably(None)
+                }
+                sendmsg(&write, &[], &mut buf, SendFlags::empty()).unwrap_or_else(|e| { eprintln!("sendmsg failed"); let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let err = unsafe { execve(exec_path.as_ptr(), argv.as_ptr(), __environ.get())}.into_err();
 
                 let errno = err.get();
@@ -115,12 +125,16 @@ export_syscall! {
                 drop(write);
 
                 let mut n = 0u16;
-                let mut buf = RecvAncillaryBuffer::new(&mut buf);
+                let mut buf = RecvAncillaryBuffer::new(&mut buf.0);
                 let mut waittarg = WaitId::Pid(unsafe { Pid::from_raw_unchecked(pid) });
                 let _ = recvmsg(&read, &mut [], &mut buf, RecvFlags::CMSG_CLOEXEC)
                     .map_err(|e| {let _ = waitid(waittarg.clone(), WaitIdOptions::EXITED); linux_error_to_lilium(unsafe { Error::new_unchecked(e.raw_os_error() as u16) })})?;
 
-                let pidfd = match buf.drain().next() {
+                let msg = buf.drain().next();
+
+                eprintln!("Recieved message {msg:?}");
+
+                let pidfd = match msg {
                     Some(RecvAncillaryMessage::ScmRights(mut fd)) => {
                         let pidfd = fd.next().unwrap();
                         pidfd
