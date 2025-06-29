@@ -132,7 +132,6 @@ export_syscall! {
 
                 let msg = buf.drain().next();
 
-                eprintln!("Recieved message {msg:?}");
 
                 let pidfd = match msg {
                     Some(RecvAncillaryMessage::ScmRights(mut fd)) => {
