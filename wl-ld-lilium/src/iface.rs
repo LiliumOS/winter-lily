@@ -25,12 +25,18 @@ unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
             "mov rax, qword ptr [rax + {load_size}]",
             "test rax, qword ptr fs:[{load_size}]",
             "ja 3f",
+            "mov rax, qword ptr [{TLS_MC}+rip]",
+            "mov rax, qword ptr [rax + {dyn_size}]",
+            "test rax, qword ptr fs:[{dyn_size}]",
+            "ja 3f",
             "2:",
             "mov rax, qword ptr [rdi]",
             "add rax, qword ptr [rdi+8]",
             "add rax, qword ptr fs:[0]",
             "ret",
             "3:",
+            "push rax",
+            "push rdi",
             "push rsi", // Stack is now 16-byte aligned
 
             "push rdx",
@@ -52,8 +58,12 @@ unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
             "pop rdx",
 
             "pop rsi",
+            "pop rdi",
+            "pop rax",
+            "jmp 2b",
             ".protected __tls_get_addr",
             load_size = const offset_of!(Tcb, load_size),
+            dyn_size = const offset_of!(Tcb, dyn_size),
             TLS_MC = sym TLS_MC
         }
     }

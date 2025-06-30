@@ -1,10 +1,13 @@
 use core::ffi::c_void;
 
 use lilium_sys::uuid::{Uuid, parse_uuid};
-use linux_raw_sys::general::{SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGQUIT, SIGSEGV, siginfo_t};
+use linux_raw_sys::general::{
+    SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGINT, SIGKILL, SIGQUIT, SIGSEGV, SIGTRAP, siginfo_t,
+};
 
 use core::arch::{global_asm, naked_asm};
 
+use crate::eprintln;
 use crate::libc::mcontext_t;
 
 use crate::{helpers::exit_unrecoverably, libc::ucontext_t, syscall_handler::__handle_syscall};
@@ -16,8 +19,14 @@ pub fn sig_to_except(signo: u32) -> Option<Uuid> {
         SIGSEGV => Some(const { parse_uuid("fcf8d451-89e6-50b5-b2e6-396aec58a74a") }),
         SIGILL => Some(const { parse_uuid("9dc46cba-85a4-5b94-be24-03717a40c72b") }),
         SIGFPE => Some(const { parse_uuid("5c91c672-f971-5b6b-a806-d6a6d2c8eb8a") }),
+        SIGKILL => Some(const { parse_uuid("f2520097-7a84-54f6-baf6-380242841fe9") }),
+        SIGINT => Some(const { parse_uuid("255f142a-31da-53d6-8667-a69cd7c2ab12") }),
+        SIGTRAP => Some(const { parse_uuid("df1ddb62-49c5-560f-86ab-1910471570b1") }),
         SIGQUIT => None,
-        _ => Some(const { parse_uuid("79a90b8e-8f4b-5134-8aa2-ff68877017db") }),
+        signo => {
+            eprintln!("Caught signal {signo}");
+            Some(const { parse_uuid("79a90b8e-8f4b-5134-8aa2-ff68877017db") })
+        }
     }
 }
 
