@@ -92,27 +92,28 @@ export_syscall! {
             args.push(CString::new(path).unwrap())
         }
 
+
         let mut argv = args.iter()
             .map(|v| v.as_ptr())
             .collect::<Vec<_>>();
         argv.push(core::ptr::null());
 
-        let (read, write) = rustix::net::socketpair(AddressFamily::UNIX, SocketType::STREAM, SocketFlags::CLOEXEC, None)
+        let (read, write) = rustix::net::socketpair(AddressFamily::UNIX, SocketType::SEQPACKET, SocketFlags::CLOEXEC, None)
             .unwrap();
+        let _ = rustix::net::shutdown(&read, rustix::net::Shutdown::Write);
+        let _ = rustix::net::shutdown(&write, rustix::net::Shutdown::Read);
         const SPACE_NEEDED: usize = rustix::cmsg_space!(ScmRights(1));
         let mut buf = Align16([const { MaybeUninit::uninit() }; SPACE_NEEDED]);
         match unsafe { fork() } {
             Ok(0) => {
-                eprintln!("Entered Child");
-                let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { eprintln!("Opening pidfd failed"); let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
+                let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let msg = SendAncillaryMessage::ScmRights(&[fd.as_fd()]);
                 let mut buf = SendAncillaryBuffer::new(&mut buf.0);
                 if !buf.push(msg) {
-                    eprintln!("Push to MSG_BUF failed");
                     let _ = rustix::io::write(&write, bytemuck::bytes_of(&EINVAL.get()));
                     exit_unrecoverably(None)
                 }
-                sendmsg(&write, &[], &mut buf, SendFlags::empty()).unwrap_or_else(|e| { eprintln!("sendmsg failed"); let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
+                sendmsg(&write, &[], &mut buf, SendFlags::empty()).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let err = unsafe { execve(exec_path.as_ptr(), argv.as_ptr(), __environ.get())}.into_err();
 
                 let errno = err.get();
@@ -121,8 +122,6 @@ export_syscall! {
                 exit_unrecoverably(None)
             }
             Ok(pid) => {
-
-
                 let mut n = 0u16;
                 let mut buf = RecvAncillaryBuffer::new(&mut buf.0);
                 let mut waittarg = WaitId::Pid(unsafe { Pid::from_raw_unchecked(pid) });
@@ -167,7 +166,8 @@ export_syscall! {
     unsafe extern fn JoinProcess(hdl: HandlePtr<ProcessHandle>, status_out: *mut JoinStatus) -> Result<()> {
         let hdl = unsafe { Handle::try_deref(hdl.cast())? };
 
-        hdl.check_type(HANDLE_TYPE_PROC as usize, !0)?;
+        hdl.check_type(HANDLE_TYPE_PROC as usize, 0)?;
+
 
 
         let fd = hdl.borrow_fd().unwrap();
