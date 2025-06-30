@@ -6,7 +6,7 @@ use core::{
 };
 
 use alloc::alloc::{alloc, dealloc};
-use lilium_sys::misc::MaybeValid;
+use lilium_sys::{misc::MaybeValid, uuid::{parse_uuid, Uuid}};
 use linux_raw_sys::general::{
     __sighandler_t, SA_RESTART, SA_SIGINFO, kernel_sigset_t, siginfo_t, stack_t,
 };
@@ -192,7 +192,7 @@ mod regno_imp {
 
 pub use regno_imp::*;
 
-use crate::{eprint, eprintln};
+use crate::{eprint, eprintln, helpers::exit_unrecoverably};
 
 #[repr(C)]
 #[cfg(target_arch = "x86_64")]
@@ -283,4 +283,9 @@ unsafe extern "C" fn free(ptr: *mut c_void) {
     unsafe {
         dealloc(real_base.cast::<u8>(), layout);
     }
+}
+
+#[unsafe(no_mangle)]
+unsafe extern "C" fn __stack_chk_fail() -> ! {
+    exit_unrecoverably(Some(parse_uuid("466fbae6-be8b-5525-bd04-ee7153b74f55")))
 }
