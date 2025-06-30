@@ -7,7 +7,9 @@ use core::{
 
 use alloc::alloc::{alloc, dealloc};
 use lilium_sys::misc::MaybeValid;
-use linux_raw_sys::general::{__sighandler_t, SA_SIGINFO, kernel_sigset_t, siginfo_t, stack_t};
+use linux_raw_sys::general::{
+    __sighandler_t, SA_RESTART, SA_SIGINFO, kernel_sigset_t, siginfo_t, stack_t,
+};
 use linux_syscall::{SYS_rt_sigaction, syscall};
 
 #[repr(C, align(64))]
@@ -87,7 +89,8 @@ pub unsafe extern "C" fn sigaction(
     let ksig_action = if !action.is_null() {
         kernel_sigaction {
             sa_handler_kernel: unsafe { core::mem::transmute((*action).sa_handler) },
-            sa_flags: (unsafe { (*action).sa_flags } | SA_RESTORER | SA_SIGINFO) as u64,
+            sa_flags: (unsafe { (*action).sa_flags } | SA_RESTORER | SA_SIGINFO | SA_RESTART)
+                as u64,
             sa_restorer: Some(impl_restorer),
             sa_mask: unsafe { (*action).sa_mask },
         }

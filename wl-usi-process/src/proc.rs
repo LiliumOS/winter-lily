@@ -103,7 +103,6 @@ export_syscall! {
         let mut buf = Align16([const { MaybeUninit::uninit() }; SPACE_NEEDED]);
         match unsafe { fork() } {
             Ok(0) => {
-                drop(read);
                 eprintln!("Entered Child");
                 let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { eprintln!("Opening pidfd failed"); let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
                 let msg = SendAncillaryMessage::ScmRights(&[fd.as_fd()]);
@@ -122,7 +121,7 @@ export_syscall! {
                 exit_unrecoverably(None)
             }
             Ok(pid) => {
-                drop(write);
+
 
                 let mut n = 0u16;
                 let mut buf = RecvAncillaryBuffer::new(&mut buf.0);
@@ -141,6 +140,7 @@ export_syscall! {
                     _ => {let _ = waitid(waittarg, WaitIdOptions::EXITED); lilium_sys::result::Error::from_code(-0x802)?; unreachable!()}
                 };
                 waittarg = WaitId::PidFd(pidfd.as_fd());
+                drop(write);
                 match rustix::io::read(read, bytemuck::bytes_of_mut(&mut n)) {
                     Ok(1..) => {
                         let _ = waitid(waittarg, WaitIdOptions::EXITED);
