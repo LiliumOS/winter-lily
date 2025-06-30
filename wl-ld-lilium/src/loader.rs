@@ -291,20 +291,20 @@ impl LoaderImpl for FdLoader {
         Ok(module) // every module is valid for offset
     }
 
-    fn load_tls(
+    unsafe fn load_tls(
         &self,
         tls_module: isize,
-        desc: *mut c_void,
-        off: ElfOffset,
+        laddr: *mut c_void,
         sz: ElfSize,
     ) -> Result<(), Error> {
         let tp = TLS_MC.0;
 
         let module = tp.wrapping_offset(tls_module);
 
-        let sl = unsafe { core::slice::from_raw_parts_mut(module.cast::<u8>(), sz as usize) };
-
-        self.read_offset(off, desc, sl)
+        unsafe {
+            core::ptr::copy_nonoverlapping(laddr.cast(), module, sz as usize);
+        }
+        Ok(())
     }
 }
 
