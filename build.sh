@@ -57,7 +57,7 @@ then
 # (cd wl-ld-lilium && cargo build -Z build-std="core,alloc" --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_LD") || exit $?
 
 echo "Building: wl host libraries"
-LINK_TARGET_DIR="$CARGO_TARGET_DIR/$TARGET_RUST/$TARG_DIR" cargo build -Z build-std="core,alloc"  --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
+LINK_TARGET_DIR="$CARGO_TARGET_DIR/$TARGET_RUST/$TARG_DIR" RUSTFLAGS="--cap-lints allow" cargo build -Z build-std="core,alloc"  --target-dir "$CARGO_TARGET_DIR" --target "$TARGET_RUST" $CARGOFLAGS || exit $?
 
 mkdir -p "$PREFIX/etc"
 
