@@ -7,7 +7,7 @@ use rustix::fd::{BorrowedFd, IntoRawFd};
 use rustix::fs::{Mode, OFlags};
 use wl_impl::handle_base::{self, Handle};
 use wl_impl::helpers::linux_error_to_lilium;
-use wl_impl::{export_syscall, libc};
+use wl_impl::{eprintln, export_syscall, libc};
 
 export_syscall! {
     unsafe extern fn OpenFile(ohdl: *mut HandlePtr<sys::FileHandle>, resolution_base: HandlePtr<sys::FileHandle>, path: KStrCPtr, opts: *const sys::FileOpenOptions) -> Result<()> {
@@ -28,29 +28,29 @@ export_syscall! {
         }
         else if (opts.access_mode & (sys::ACCESS_READ | sys::ACCESS_WRITE)) ==  (sys::ACCESS_READ | sys::ACCESS_WRITE){
             oflags |= OFlags::RDWR
-        } else if (opts.access_mode & sys::ACCESS_READ) == 0 {
+        } else if (opts.access_mode & sys::ACCESS_READ) != 0 {
             oflags |= OFlags::RDONLY
-        } else if (opts.access_mode & sys::ACCESS_WRITE) == 0 {
+        } else if (opts.access_mode & sys::ACCESS_WRITE) != 0 {
             oflags |= OFlags::WRONLY
         }
 
-        if ( opts.access_mode & sys::ACCESS_CREATE) == 0 {
+        if ( opts.access_mode & sys::ACCESS_CREATE) != 0 {
             oflags |= OFlags::CREATE
         }
 
-        if (opts.access_mode & sys::ACCESS_CREATE_EXCLUSIVE) == 0 {
+        if (opts.access_mode & sys::ACCESS_CREATE_EXCLUSIVE) != 0 {
             oflags |= OFlags::EXCL;
         }
 
-        if (opts.access_mode & sys::ACCESS_LINK_STREAM_DIRECT) == 0 {
+        if (opts.access_mode & sys::ACCESS_LINK_STREAM_DIRECT) != 0 {
             oflags |= OFlags::NOFOLLOW
         }
 
-        if (opts.access_mode & sys::ACCESS_TRUNCATE) == 0 {
+        if (opts.access_mode & sys::ACCESS_TRUNCATE) != 0 {
             oflags |= OFlags::TRUNC
         }
 
-        if (opts.access_mode & sys::ACCESS_START_END) == 0 {
+        if (opts.access_mode & sys::ACCESS_START_END) != 0 {
             oflags |= OFlags::APPEND
         }
 
@@ -60,6 +60,8 @@ export_syscall! {
 
         let path = CString::new(unsafe { path.as_str() })
             .or_else(|_| Error::from_code(-0x801).map(|_| unreachable!()))?;
+
+        eprintln!("openat({dirfd:?}, {path:?}, {oflags:?})");
 
         let mode = Mode::from_raw_mode(0o666);
 
