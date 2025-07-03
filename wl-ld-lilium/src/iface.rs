@@ -21,9 +21,9 @@ pub struct TlsDesc {
 unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
     unsafe {
         naked_asm! {
-            "lea rax, qword ptr [{TLS_MC}+rip]",
+            "mov rax, qword ptr [{TLS_MC}+rip]",
             "mov rax, qword ptr [rax + {version}]",
-            "test rax, qword ptr fs:[{version}]",
+            "cmp rax, qword ptr fs:[{version}]",
             "jne 3f",
             "2:",
             "mov rax, qword ptr [rdi]",
