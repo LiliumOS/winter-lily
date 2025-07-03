@@ -6,7 +6,10 @@ use core::{
 };
 
 use alloc::alloc::{alloc, dealloc};
-use lilium_sys::{misc::MaybeValid, uuid::{parse_uuid, Uuid}};
+use lilium_sys::{
+    misc::MaybeValid,
+    uuid::{Uuid, parse_uuid},
+};
 use linux_raw_sys::general::{
     __sighandler_t, SA_RESTART, SA_SIGINFO, kernel_sigset_t, siginfo_t, stack_t,
 };
@@ -31,10 +34,10 @@ unsafe extern "C" fn __setjmp(buf: *mut jmp_buf) -> i32 {
             "mov qword ptr [rdi+24], r13",
             "mov qword ptr [rdi+32], r14",
             "mov qword ptr [rdi+40], r15",
-            "mov rsi, qword ptr [rsp]",
+            "pop rsi",
             "mov qword ptr [rdi+48], rsp",
             "mov qword ptr [rdi+56], rsi",
-            "ret",
+            "jmp rsi",
             ".protected {sym}",
 
             sym = sym __setjmp

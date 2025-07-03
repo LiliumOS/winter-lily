@@ -1,4 +1,4 @@
-#![feature(never_type)]
+#![feature(never_type, sync_unsafe_cell)]
 #![no_std]
 use lilium_sys::{
     sys::sysno::base::{SYS_GetSystemInfo, SYS_UnmanagedException},

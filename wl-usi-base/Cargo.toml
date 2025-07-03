@@ -10,6 +10,7 @@ uuid = { version = "1.16.0", features = ["v5"], default-features = false }
 wl-impl.workspace = true
 wl-helpers.workspace = true
 cfg-match.workspace = true
+bytemuck.workspace = true
 
 [lib]
 crate-type = ["cdylib"]

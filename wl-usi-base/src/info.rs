@@ -1,3 +1,5 @@
+use core::cell::SyncUnsafeCell;
+
 use lilium_sys::{
     result::Error,
     sys::{
@@ -6,7 +8,12 @@ use lilium_sys::{
     },
     uuid::{Uuid, parse_uuid},
 };
-use wl_impl::{consts, export_syscall, helpers::*, syscall_handler::all_subsystems};
+use wl_impl::{
+    consts, export_syscall,
+    helpers::*,
+    libc::{new_utsname, uname},
+    syscall_handler::all_subsystems,
+};
 
 use lilium_sys::result::Result;
 use wl_helpers::LazyLock;
@@ -17,6 +24,23 @@ static VERSION: LazyLock<Uuid> = LazyLock::new(|| {
     let uuid = uuid::Uuid::new_v5(&BASE, consts::VERSION.as_bytes());
 
     uuid.into()
+});
+
+static UNAME_BUF: SyncUnsafeCell<new_utsname> = SyncUnsafeCell::new(unsafe { core::mem::zeroed() });
+
+static COMPUTER_NAME: LazyLock<(&'static str, Uuid)> = LazyLock::new(|| {
+    let str = (unsafe { uname(UNAME_BUF.get()) })
+        .map_err(|_| ())
+        .and_then(|_| {
+            let b = unsafe { &(*UNAME_BUF.get()).nodename };
+            let n = b.iter().take_while(|c| (**c) != 0).count();
+            str::from_utf8(bytemuck::cast_slice(&b[..n])).map_err(|_| ())
+        })
+        .unwrap_or("**UNKNOWN SYSTEM NAME**!");
+
+    let uuid = uuid::Uuid::new_v5(&BASE, str.as_bytes());
+
+    (str, uuid.into())
 });
 
 static ARCH_TYPE_VERSION: LazyLock<(Uuid, u32)> = LazyLock::new(|| {
@@ -61,9 +85,9 @@ fn process_request(req: &mut sys::SysInfoRequest) -> Result<()> {
         sys::SYSINFO_REQUEST_OSVER => {
             let req = unsafe { &mut req.os_version };
             req.head.flags &= !0x0001;
-            unsafe { fill_str(&mut req.osvendor_name, consts::KVENDOR_NAME)? };
-            req.os_major = consts::VERSION_MAJOR;
-            req.os_minor = consts::VERSION_MINOR;
+            unsafe { fill_str(&mut req.osvendor_name, consts::OS_ELAB_NAME)? };
+            req.os_major = consts::OS_VERSION_MAJOR;
+            req.os_minor = consts::OS_VERSION_MINOR;
             Ok(())
         }
         sys::SYSINFO_REQUEST_KVENDOR => {
@@ -82,6 +106,16 @@ fn process_request(req: &mut sys::SysInfoRequest) -> Result<()> {
             req.arch_type = arch_type;
             req.arch_version = arch_version;
             Ok(())
+        }
+        sys::SYSINFO_REQUEST_COMPUTER_NAME => {
+            let req = unsafe { &mut req.computer_name };
+            req.head.flags &= !0x0001;
+            req.sys_id = COMPUTER_NAME.1;
+            let mut ret = Ok(());
+            ret = unsafe { fill_str(&mut req.hostname, COMPUTER_NAME.0).and(ret) };
+            ret = unsafe { fill_str(&mut req.sys_display_name, COMPUTER_NAME.0).and(ret) };
+            ret = unsafe { fill_str(&mut req.sys_label, COMPUTER_NAME.0).and(ret) };
+            ret
         }
         id => {
             if let Some((subsys, info)) = all_subsystems().find(|(_, subsys)| subsys.uuid == id) {

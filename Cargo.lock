@@ -938,6 +938,7 @@ dependencies = [
 name = "wl-usi-base"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "cfg-match",
  "lilium-sys",
  "uuid",

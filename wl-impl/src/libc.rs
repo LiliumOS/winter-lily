@@ -5,6 +5,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 
 pub use linux_errno::*;
 
+pub use linux_raw_sys::system::new_utsname;
 pub use linux_syscall::Result as Check;
 
 pub use linux_syscall::syscall;
@@ -47,6 +48,8 @@ def_syscall! {
 
     fn fork() -> i32;
     fn execve(pathname: *const c_char, argv: *const *const c_char, envp: *const *const c_char) -> !;
+
+    fn uname(uts: *mut new_utsname) -> ();
 }
 
 pub trait FromSysVal {

@@ -114,6 +114,10 @@ pub mod consts {
     pub const VERSION_MINOR: u32 = const_parse_u32(core::env!("CARGO_PKG_VERSION_MINOR"), 10);
     pub const VERSION_PATCH: u32 = const_parse_u32(core::env!("CARGO_PKG_VERSION_PATCH"), 10);
 
+    pub const OS_ELAB_NAME: &str = "Lilium";
+    pub const OS_VERSION_MAJOR: u32 = 0;
+    pub const OS_VERSION_MINOR: u32 = 1;
+
     pub const KAPI_VERSION: u64 =
         ((VERSION_MAJOR as u64) << 40) | ((VERSION_MINOR as u64) << 20) | (VERSION_PATCH as u64);
 }

@@ -6,6 +6,8 @@
 
 #include <setjmp.h>
 
+extern void __memcpy_explicit(void* restrict _dest, const void* restrict _src, size_t _len);
+
 _Thread_local static _Atomic(jmp_buf *) CHECKED_ACCESS_RETBUF;
 
 _Thread_local static _Atomic(struct CheckedAccessError *) CHECKED_ACCESS_ERROR;
