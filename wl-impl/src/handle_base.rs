@@ -21,6 +21,9 @@ use wl_interface_map::{GetInitHandlesTy, wl_get_init_handles_name};
 
 use core::ffi::c_void;
 
+use crate::eprintln;
+use crate::libc::close;
+
 #[repr(C, align(32))]
 #[derive(bytemuck::Zeroable)]
 pub struct Handle {
@@ -30,21 +33,28 @@ pub struct Handle {
     pub fd: c_long,
 }
 
+const NHANDLES: usize = 512;
+
 #[thread_local]
-static HANDLE_ARRAY: [UnsafeCell<Handle>; 512] =
-    [const { UnsafeCell::new(bytemuck::zeroed()) }; 512];
+static HANDLE_ARRAY: [UnsafeCell<Handle>; NHANDLES] =
+    [const { UnsafeCell::new(bytemuck::zeroed()) }; NHANDLES];
 
 #[thread_local]
 static START_HINT: Cell<usize> = Cell::new(0);
 
+#[thread_local]
+static LIVE_HANDLES: Cell<usize> = Cell::new(0);
+
 pub fn insert_handle(handle: Handle) -> Result<HandlePtr<Handle>> {
     let start = START_HINT.get();
-    for n in (0..512).map(|n| (n + start) & 511) {
+    // eprintln!("Live Handles at insert_handle: {}", LIVE_HANDLES.get());
+    for n in (0..NHANDLES).map(|n| (n + start) & (NHANDLES - 1)) {
         let h = &HANDLE_ARRAY[n];
         let v = h.get();
 
         if unsafe { v.cast::<usize>().read() } == 0 {
             START_HINT.set(n);
+            LIVE_HANDLES.update(|v| v + 1);
             unsafe {
                 v.write(handle);
             }
@@ -56,11 +66,22 @@ pub fn insert_handle(handle: Handle) -> Result<HandlePtr<Handle>> {
     Err(lilium_sys::result::Error::ResourceLimitExhausted)
 }
 
-impl Drop for Handle {
-    fn drop(&mut self) {}
-}
-
 impl Handle {
+    pub fn close(&mut self, use_fd2: bool) {
+        LIVE_HANDLES.update(|v| v - 1);
+        if use_fd2 {
+            let fd2 = self.blob2.addr() as isize;
+            if fd2 < 0 {
+                let _ = unsafe { close(-(fd2 as i32)) };
+            }
+        }
+
+        if self.fd >= 0 {
+            let _ = unsafe { close(self.fd as i32) };
+        }
+
+        *self = bytemuck::zeroed();
+    }
     pub unsafe fn try_deref<'a>(ptr: HandlePtr<Handle>) -> Result<&'a mut Handle> {
         let ptr: *mut Handle = unsafe { core::mem::transmute(ptr) };
         if HANDLE_ARRAY
@@ -74,6 +95,11 @@ impl Handle {
             }
         }
         Err(lilium_sys::result::Error::InvalidHandle)
+    }
+
+    pub unsafe fn deref_unchecked<'a>(ptr: HandlePtr<Handle>) -> &'a mut Handle {
+        let ptr: *mut Handle = unsafe { core::mem::transmute(ptr) };
+        unsafe { &mut *ptr }
     }
 
     pub fn ident(&self) -> usize {

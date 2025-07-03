@@ -7,7 +7,7 @@ use core::{
 use alloc::{ffi::CString, string::ToString, vec::Vec};
 
 use rustix::{
-    fd::{AsFd, IntoRawFd},
+    fd::{AsFd, BorrowedFd, IntoRawFd},
     net::{
         AddressFamily, RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags, SendAncillaryBuffer,
         SendAncillaryMessage, SendFlags, SocketFlags, SocketType, recvmsg, sendmsg,
@@ -21,7 +21,7 @@ use wl_impl::{
     eprintln, export_syscall,
     handle_base::{Handle, insert_handle},
     helpers::{exit_unrecoverably, linux_error_to_lilium},
-    libc::{EINVAL, Error, execve, exit_group, fork},
+    libc::{EINVAL, Error, close, execve, exit_group, fork},
     ministd::AsRawFd,
     println,
 };
@@ -104,6 +104,12 @@ export_syscall! {
         let _ = rustix::net::shutdown(&write, rustix::net::Shutdown::Read);
         const SPACE_NEEDED: usize = rustix::cmsg_space!(ScmRights(1));
         let mut buf = Align16([const { MaybeUninit::uninit() }; SPACE_NEEDED]);
+
+        let hdl = Handle {ty: HANDLE_TYPE_PROC as usize, blob1: core::ptr::null_mut(), blob2: core::ptr::null_mut(), fd: -1};
+
+        let ptr = insert_handle(hdl)?;
+
+        let mut hdl = unsafe { Handle::deref_unchecked(ptr) };
         match unsafe { fork() } {
             Ok(0) => {
                 let fd = pidfd_open(getpid(), PidfdFlags::empty()).unwrap_or_else(|e| { let _ = rustix::io::write(&write, bytemuck::bytes_of(&(e.raw_os_error() as u16))); exit_unrecoverably(None)});
@@ -126,7 +132,7 @@ export_syscall! {
                 let mut buf = RecvAncillaryBuffer::new(&mut buf.0);
                 let mut waittarg = WaitId::Pid(unsafe { Pid::from_raw_unchecked(pid) });
                 let _ = recvmsg(&read, &mut [], &mut buf, RecvFlags::CMSG_CLOEXEC)
-                    .map_err(|e| {let _ = waitid(waittarg.clone(), WaitIdOptions::EXITED); linux_error_to_lilium(unsafe { Error::new_unchecked(e.raw_os_error() as u16) })})?;
+                    .map_err(|e| {hdl.close(false); let _ = waitid(waittarg.clone(), WaitIdOptions::EXITED); linux_error_to_lilium(unsafe { Error::new_unchecked(e.raw_os_error() as u16) })})?;
 
                 let msg = buf.drain().next();
 
@@ -136,19 +142,21 @@ export_syscall! {
                         let pidfd = fd.next().unwrap();
                         pidfd
                     },
-                    _ => {let _ = waitid(waittarg, WaitIdOptions::EXITED); lilium_sys::result::Error::from_code(-0x802)?; unreachable!()}
+                    _ => {hdl.close(false); let _ = waitid(waittarg, WaitIdOptions::EXITED); lilium_sys::result::Error::from_code(-0x802)?; unreachable!()}
                 };
-                waittarg = WaitId::PidFd(pidfd.as_fd());
+                let rawfd = pidfd.into_raw_fd();
+                waittarg = WaitId::PidFd(unsafe { BorrowedFd::borrow_raw(rawfd)});
+                hdl.fd = rawfd as i64;
+                hdl.blob2 = core::ptr::without_provenance_mut(pid as usize);
                 drop(write);
                 match rustix::io::read(read, bytemuck::bytes_of_mut(&mut n)) {
                     Ok(1..) => {
+                        hdl.close(false);
                         let _ = waitid(waittarg, WaitIdOptions::EXITED);
                         return Err(Error::new(n).map_or(lilium_sys::result::Error::ResourceLimitExhausted, linux_error_to_lilium))
                     }
                     Ok(0) | Err(_) => {
-                        let hdl = Handle {ty: HANDLE_TYPE_PROC as usize, blob1: core::ptr::null_mut(), blob2: core::ptr::without_provenance_mut(pid as usize), fd: pidfd.into_raw_fd() as i64};
 
-                        let ptr = insert_handle(hdl)?;
                         unsafe { hdl_out.write(ptr.cast()); }
                         Ok(())
                     }
@@ -164,7 +172,7 @@ export_syscall! {
 
 export_syscall! {
     unsafe extern fn JoinProcess(hdl: HandlePtr<ProcessHandle>, status_out: *mut JoinStatus) -> Result<()> {
-        let hdl = unsafe { Handle::try_deref(hdl.cast())? };
+        let mut hdl = unsafe { Handle::try_deref(hdl.cast())? };
 
         hdl.check_type(HANDLE_TYPE_PROC as usize, 0)?;
 
@@ -175,7 +183,7 @@ export_syscall! {
         let status = waitid(WaitId::PidFd(fd), WaitIdOptions::EXITED)
             .map_err(|e| linux_error_to_lilium(unsafe { Error::new_unchecked(e.raw_os_error() as u16) }))?
             .unwrap();
-
+        hdl.close(false);
         let status = if let Some(sig) = status.terminating_signal() {
             let except = sig_to_except(sig as u32);
             if let Some(except) = except {
