@@ -21,14 +21,10 @@ pub struct TlsDesc {
 unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
     unsafe {
         naked_asm! {
-            "mov rax, qword ptr [{TLS_MC}+rip]",
-            "mov rax, qword ptr [rax + {load_size}]",
-            "test rax, qword ptr fs:[{load_size}]",
-            "ja 3f",
-            "mov rax, qword ptr [{TLS_MC}+rip]",
-            "mov rax, qword ptr [rax + {dyn_size}]",
-            "test rax, qword ptr fs:[{dyn_size}]",
-            "ja 3f",
+            "lea rax, qword ptr [{TLS_MC}+rip]",
+            "mov rax, qword ptr [rax + {version}]",
+            "test rax, qword ptr fs:[{version}]",
+            "jne 3f",
             "2:",
             "mov rax, qword ptr [rdi]",
             "add rax, qword ptr [rdi+8]",
@@ -62,8 +58,7 @@ unsafe extern "C" fn __tls_get_addr(desc: *const TlsDesc) -> *mut c_void {
             "pop rax",
             "jmp 2b",
             ".protected __tls_get_addr",
-            load_size = const offset_of!(Tcb, load_size),
-            dyn_size = const offset_of!(Tcb, dyn_size),
+            version = const offset_of!(Tcb, version),
             TLS_MC = sym TLS_MC
         }
     }

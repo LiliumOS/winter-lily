@@ -276,12 +276,14 @@ impl LoaderImpl for FdLoader {
         if !exec_tls {
             unsafe {
                 (*get_master_tcb()).load_size += tls_size.wrapping_add_signed(aligned_val - val);
+                (*get_master_tcb()).version += 1;
             }
             Ok(aligned_val)
         } else {
             eprintln!("TLS Size: {aligned_val}");
             unsafe {
                 (*get_master_tcb()).dyn_size = (-aligned_val) as usize;
+                (*get_master_tcb()).version += 1;
             }
             Ok(aligned_val)
         }
@@ -321,6 +323,7 @@ pub struct Tcb {
     tls_base: *mut c_void,
     pub load_size: usize,
     pub dyn_size: usize,
+    pub version: usize,
 }
 
 pub static LOADER: FdLoader = FdLoader {
@@ -342,6 +345,7 @@ pub unsafe fn setup_tls_mc(tls_mc: *mut c_void) {
             tls_base: tls_mc,
             load_size: core::mem::size_of::<Tcb>(),
             dyn_size: 0,
+            version: 0,
         })
     }
 }
@@ -392,6 +396,8 @@ pub fn update_tls() {
         tcb.dyn_size = mtcb.dyn_size;
     }
 
+    tcb.version = mtcb.version;
+
     eprintln!("TCB after update_tls: {tcb:?}");
 }
 
@@ -401,6 +407,7 @@ pub fn set_tp(ptr: *mut c_void) {
             tls_base: ptr,
             load_size: core::mem::size_of::<Tcb>(),
             dyn_size: 0,
+            version: 0,
         });
     }
     cfg_match::cfg_match! {
