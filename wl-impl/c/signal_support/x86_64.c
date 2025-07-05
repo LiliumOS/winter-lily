@@ -29,46 +29,7 @@ long __checked_memcpy_impl(void *restrict _dest, const void *restrict _src, size
     }
     atomic_store_explicit(&CHECKED_ACCESS_ERROR, _acc, memory_order_relaxed);
     atomic_store_explicit(&CHECKED_ACCESS_RETBUF, NULL, memory_order_release);
-    __asm__("cmp rdx, 16\n" 
-        "jbe 3f\n"
-        "2:\n"
-        "movups xmm0, qword ptr [rsi]\n"
-        "movups qword ptr [rdi], xmm0\n"
-        "lea rdi, [rdi+16]\n"
-        "lea rsi, [rsi+16]\n"
-        "sub rdx, 16\n"
-        "cmp rdx, 16\n"
-        "jae 2b\n"
-        "3:\n"
-        "cmp rdx, 8\n"
-        "jbe 2f\n"
-        "mov rax, qword ptr [rsi]\n"
-        "mov qword ptr [rdi], rax\n"
-        "lea rdi, [rdi+8]\n"
-        "lea rsi, [rsi+8]\n"
-        "sub rdx, 8\n"
-        "2:\n"
-        "cmp rdx, 4\n"
-        "jbe 2f\n"
-        "mov eax, dword ptr [rsi]\n"
-        "mov dword ptr [rdi], eax\n"
-        "lea rdi, [rdi+4]\n"
-        "lea rsi, [rsi+4]\n"
-        "sub rdx, 4\n"
-        "2:\n"
-        "cmp rdx, 2\n"
-        "jbe 2f\n"
-        "mov ax, word ptr [rsi]\n"
-        "mov word ptr [rdi], ax\n"
-        "lea rdi, [rdi+2]\n"
-        "lea rsi, [rsi+2]\n"
-        "sub rdx, 2\n"
-        "2:\n"
-        "cmp rdx, 1\n"
-        "jbe 2f\n"
-        "mov al, byte ptr [rsi]\n"
-        "mov byte ptr [rdi], al\n"
-        : "+D"(_dest), "+S"(_src), "+d"(_len)::"cx", "r8", "r9", "cc", "xmm0", "ax", "memory");
+    __memcpy_explicit(_dest, _src, _len);
     atomic_store_explicit(&CHECKED_ACCESS_RETBUF, NULL, memory_order_relaxed);
     return 0;
 }

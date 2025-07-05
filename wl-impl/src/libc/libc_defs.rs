@@ -69,6 +69,55 @@ unsafe extern "C-unwind" fn longjmp(buf: *mut jmp_buf, status: i32) -> ! {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+unsafe extern "C-unwind" fn __memcpy_explicit(dest: *mut c_void, src: *mut c_void, len: usize) {
+    naked_asm! {
+        "cmp rdx, 16",
+        "jbe 3f",
+        "2:",
+        "movups xmm0, xmmword ptr [rsi]",
+        "movups xmmword ptr [rdi], xmm0",
+        "lea rdi, [rdi+16]",
+        "lea rsi, [rsi+16]",
+        "sub rdx, 16",
+        "cmp rdx, 16",
+        "jae 2b",
+        "3:",
+        "cmp rdx, 8",
+        "jbe 2f",
+        "mov rax, qword ptr [rsi]",
+        "mov qword ptr [rdi], rax",
+        "lea rdi, [rdi+8]",
+        "lea rsi, [rsi+8]",
+        "sub rdx, 8",
+        "2:",
+        "cmp rdx, 4",
+        "jbe 2f",
+        "mov eax, dword ptr [rsi]",
+        "mov dword ptr [rdi], eax",
+        "lea rdi, [rdi+4]",
+        "lea rsi, [rsi+4]",
+        "sub rdx, 4",
+        "2:",
+        "cmp rdx, 2",
+        "jbe 2f",
+        "mov ax, word ptr [rsi]",
+        "mov word ptr [rdi], ax",
+        "lea rdi, [rdi+2]",
+        "lea rsi, [rsi+2]",
+        "sub rdx, 2",
+        "2:",
+        "cmp rdx, 1",
+        "jbe 2f",
+        "mov al, byte ptr [rsi]",
+        "mov byte ptr [rdi], al",
+        "2:",
+        "ret",
+    }
+}
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct sigaction_t {
