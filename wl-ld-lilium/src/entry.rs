@@ -1,5 +1,6 @@
 use alloc::borrow::ToOwned;
 use ld_so_impl::elf::ElfHeader;
+use ld_so_impl::helpers::cstr_from_ptr;
 use ld_so_impl::loader::Error;
 use lilium_sys::sys::auxv::{AT_LILIUM_INIT_HANDLES, AT_LILIUM_INIT_HANDLES_LEN, AT_RANDOM};
 use lilium_sys::sys::handle::{Handle, HandlePtr};
@@ -8,6 +9,8 @@ use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
 use linux_syscall::{Result as _, SYS_close, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
+use rustix::fd::AsRawFd;
+use rustix::fs::{Mode, OFlags, open};
 use wl_interface_map::{
     GetInitHandlesTy, wl_get_init_handles_name, wl_init_subsystem_name, wl_setup_process_name,
 };
@@ -131,6 +134,17 @@ unsafe extern "C" fn __rust_entry(
             }
             linux_raw_sys::general::AT_EXECFD => {
                 execfd = auxent.at_val.addr() as i32;
+            }
+            linux_raw_sys::general::AT_EXECFN => {
+                if execfd == !0 {
+                    execfd = open(
+                        unsafe { cstr_from_ptr(auxent.at_val.cast()) },
+                        OFlags::RDONLY,
+                        Mode::empty(),
+                    )
+                    .unwrap()
+                    .as_raw_fd();
+                }
             }
 
             _ => {}
