@@ -515,6 +515,8 @@ fn __setup_auxv(
         at_val: udata(init_handles.len),
     };
 
+    eprintln!("All loaded modules {:?}", WL_RESOLVER.live_entries());
+
     unsafe { __call_entry_point(argc, argv, envp, envpc, lilium_aux.as_mut_ptr(), 3, entry) }
 }
 
