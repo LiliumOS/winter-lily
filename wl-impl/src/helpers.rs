@@ -352,7 +352,7 @@ impl<T, Ty> RawCheckedSliceIter<T, Ty> {
         }
 
         let pos = base;
-        let end = unsafe { pos.map_addr(|n| n.unchecked_add(len * core::mem::size_of::<usize>())) };
+        let end = unsafe { pos.map_addr(|n| n.unchecked_add(len * core::mem::size_of::<T>())) };
 
         Self {
             pos,
@@ -371,7 +371,7 @@ impl<T, Ty: CheckedAccessType> Iterator for RawCheckedSliceIter<T, Ty> {
             return None;
         }
 
-        self.pos = unsafe { pos.map_addr(|n| n.unchecked_add(core::mem::size_of::<usize>())) };
+        self.pos = unsafe { pos.map_addr(|n| n.unchecked_add(core::mem::size_of::<T>())) };
 
         Some((unsafe { probe_checked::<Ty, T>(pos.as_ptr(), 1) }).map(|_| pos))
     }
@@ -389,7 +389,7 @@ impl<T, Ty: CheckedAccessType> Iterator for RawCheckedSliceIter<T, Ty> {
         if n <= len {
             self.pos = unsafe {
                 self.pos
-                    .map_addr(|a| a.unchecked_add(n * core::mem::size_of::<usize>()))
+                    .map_addr(|a| a.unchecked_add(n * core::mem::size_of::<T>()))
             };
             Ok(())
         } else {
@@ -597,7 +597,7 @@ pub unsafe fn fill_str(kstr: &mut KStrPtr, st: &str) -> SysResult<()> {
         copy_nonoverlapping_checked(st.as_ptr(), kstr.str_ptr, len)?;
     }
 
-    if core::mem::replace(&mut kstr.len, len) < st.len() {
+    if core::mem::replace(&mut kstr.len, st.len()) < st.len() {
         Err(SysError::InsufficientLength)
     } else {
         Ok(())
@@ -646,6 +646,7 @@ pub const fn const_parse_u32(v: &str, radix: u32) -> u32 {
 pub use wl_helpers::*;
 
 use crate::eprintln;
+use crate::libc::__memcpy_explicit;
 
 pub fn linux_error_to_lilium(errno: linux_errno::Error) -> lilium_sys::result::Error {
     match errno {

@@ -72,7 +72,11 @@ unsafe extern "C-unwind" fn longjmp(buf: *mut jmp_buf, status: i32) -> ! {
 #[cfg(target_arch = "x86_64")]
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-unsafe extern "C-unwind" fn __memcpy_explicit(dest: *mut c_void, src: *mut c_void, len: usize) {
+pub unsafe extern "C-unwind" fn __memcpy_explicit(
+    dest: *mut c_void,
+    src: *const c_void,
+    len: usize,
+) {
     naked_asm! {
         "cmp rdx, 16",
         "jbe 3f",
@@ -94,7 +98,7 @@ unsafe extern "C-unwind" fn __memcpy_explicit(dest: *mut c_void, src: *mut c_voi
         "sub rdx, 8",
         "2:",
         "cmp rdx, 4",
-        "jbe 2f",
+        "jb 2f",
         "mov eax, dword ptr [rsi]",
         "mov dword ptr [rdi], eax",
         "lea rdi, [rdi+4]",
@@ -102,7 +106,7 @@ unsafe extern "C-unwind" fn __memcpy_explicit(dest: *mut c_void, src: *mut c_voi
         "sub rdx, 4",
         "2:",
         "cmp rdx, 2",
-        "jbe 2f",
+        "jb 2f",
         "mov ax, word ptr [rsi]",
         "mov word ptr [rdi], ax",
         "lea rdi, [rdi+2]",
@@ -110,7 +114,7 @@ unsafe extern "C-unwind" fn __memcpy_explicit(dest: *mut c_void, src: *mut c_voi
         "sub rdx, 2",
         "2:",
         "cmp rdx, 1",
-        "jbe 2f",
+        "jb 2f",
         "mov al, byte ptr [rsi]",
         "mov byte ptr [rdi], al",
         "2:",

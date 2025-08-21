@@ -141,7 +141,7 @@ export_syscall! {
     unsafe extern fn GetSystemInfo(reqs: KSlice<sys::SysInfoRequest>) -> Result<()> {
         let mut res = Ok(());
         for req in unsafe { iter_mut_checked(reqs) } {
-            // This is
+            // This is intentional. Each request is processed independently
             res = res.and(process_request(req?));
         }
 
