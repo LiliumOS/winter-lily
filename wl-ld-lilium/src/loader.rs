@@ -264,7 +264,7 @@ impl LoaderImpl for FdLoader {
 
         let aligned_val = (val + (tls_align as isize - 1)) & !(tls_align as isize - 1);
 
-        eprintln!("TLS offset {val:-} (aligned: {aligned_val:-})");
+        eprintln!("TLS offset {val:-} (aligned: {aligned_val:-} ({tls_align:X}))");
 
         let pg = TLS_MC.0.map_addr(|a| a.wrapping_add_signed(val & !4095));
         let map_len = tls_size as isize + (aligned_val - (val & !4095));

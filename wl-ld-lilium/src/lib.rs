@@ -32,7 +32,13 @@ macro_rules! eprintln {
 extern crate alloc;
 
 #[panic_handler]
-fn panic_handler(_: &core::panic::PanicInfo) -> ! {
+fn panic_handler(info: &core::panic::PanicInfo) -> ! {
+    if let Some(loc) = info.location() {
+        eprintln!("panicked at {loc}: {}", info.message())
+    } else {
+        eprintln!("panicked: {}", info.message())
+    }
+
     crash_unrecoverably()
 }
 

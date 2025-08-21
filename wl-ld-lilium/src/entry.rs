@@ -182,6 +182,7 @@ unsafe extern "C" fn __rust_entry(
             .expect("UTF-8 Required");
 
         argv = unsafe { argv.add(1) };
+        argc -= 1;
         let mut args =
             unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new_unchecked(argv)) };
 

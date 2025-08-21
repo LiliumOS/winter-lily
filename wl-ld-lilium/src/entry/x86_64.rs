@@ -68,6 +68,7 @@ pub unsafe extern "sysv64" fn __call_entry_point(
         "test r11, 1",
         "je 2f",
         "push rax",
+        // Setup auxv
         "2:",
         "shl rcx, 3",
         "shl r9, 4",
@@ -81,8 +82,10 @@ pub unsafe extern "sysv64" fn __call_entry_point(
         "movups xmm0, xmmword ptr [r8+r9]",
         "movups xmmword ptr [rsp+r9], xmm0",
         "jmp 2b",
+
         "3:",
         "mov rbx, rsp",
+        // env
         "push 0",
         "2:",
         "test rcx, rcx",
@@ -92,14 +95,17 @@ pub unsafe extern "sysv64" fn __call_entry_point(
         "jmp 2b",
         "3:",
         "mov r12, rsp",
+        // argv
         "push 0",
-        "2:",
         "mov rcx, rdi",
+        "2:",
         "test rcx, rcx",
         "je 2f",
         "lea rcx, [rcx-1]",
-        "push qword ptr [rsi+rdi*8]",
+        "push qword ptr [rsi+rcx*8]",
+        "jmp 2b",
         "2:",
+        // argc
         "push rdi",
         "mov rax, 1",
         "lea rdx, [{_local_fini}+rip]",
