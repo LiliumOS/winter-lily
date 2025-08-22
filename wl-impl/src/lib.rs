@@ -60,10 +60,6 @@ unsafe extern "C" fn __wl_impl_setup_process(
     mode: FilterMode,
     rand_init: [u8; 16],
 ) {
-    println!(
-        "wl_impl_setup_process called. Protected Region ({wl_load_base:p}..{:p})",
-        wl_load_base.wrapping_add(wl_load_size)
-    );
     unsafe {
         __install_sa_handler();
     }

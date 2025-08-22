@@ -214,11 +214,11 @@ pub struct NoGlobalAlloc;
 
 unsafe impl GlobalAlloc for NoGlobalAlloc {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        debug("alloc", b"Use MmapAllocator instead of Global");
+        eprintln!("Use MmapAllocator instead of Global");
         crash_unrecoverably()
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        debug("alloc", b"Use MmapAllocator instead of Global");
+        eprintln!("Use MmapAllocator instead of Global");
         crash_unrecoverably()
     }
 }
@@ -374,55 +374,54 @@ impl<'a> DoubleEndedIterator for SplitAscii<'a> {
     }
 }
 
-const DEBUG_PROMPT: &str = "[debug] ";
-#[inline]
-pub fn debug(src: &str, buf: &[u8]) {
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            DEBUG_PROMPT.as_ptr(),
-            DEBUG_PROMPT.len()
-        );
-    }
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            src.as_ptr(),
-            src.len()
-        );
-    }
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            b": ".as_ptr(),
-            2
-        );
-    }
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            buf.as_ptr(),
-            buf.len()
-        );
-    }
-    unsafe {
-        let _ = syscall!(
-            SYS_write,
-            linux_raw_sys::general::STDERR_FILENO,
-            &b'\n' as *const u8,
-            1
-        );
-    }
-}
+// const DEBUG_PROMPT: &str = "[debug] ";
+// #[inline]
+// pub fn debug(src: &str, buf: &[u8]) {
+//     unsafe {
+//         let _ = syscall!(
+//             SYS_write,
+//             linux_raw_sys::general::STDERR_FILENO,
+//             DEBUG_PROMPT.as_ptr(),
+//             DEBUG_PROMPT.len()
+//         );
+//     }
+//     unsafe {
+//         let _ = syscall!(
+//             SYS_write,
+//             linux_raw_sys::general::STDERR_FILENO,
+//             src.as_ptr(),
+//             src.len()
+//         );
+//     }
+//     unsafe {
+//         let _ = syscall!(
+//             SYS_write,
+//             linux_raw_sys::general::STDERR_FILENO,
+//             b": ".as_ptr(),
+//             2
+//         );
+//     }
+//     unsafe {
+//         let _ = syscall!(
+//             SYS_write,
+//             linux_raw_sys::general::STDERR_FILENO,
+//             buf.as_ptr(),
+//             buf.len()
+//         );
+//     }
+//     unsafe {
+//         let _ = syscall!(
+//             SYS_write,
+//             linux_raw_sys::general::STDERR_FILENO,
+//             &b'\n' as *const u8,
+//             1
+//         );
+//     }
+// }
 
 static SYSROOT_FD: OnceLock<i32> = OnceLock::new();
 
 pub fn open_sysroot_rdonly(mut at_fd: i32, st: &str) -> crate::io::Result<i32> {
-    debug("open_sysroot_rdonly", st.as_bytes());
     let mut path = safe_zeroed::<[u8; 256]>();
     copy_to_slice_head(&mut path, st.as_bytes())[0] = 0;
 
@@ -493,9 +492,6 @@ pub fn expand_glob(
 
     let (dir, prefix) = SplitAscii::new(prefix, b'/').rsplit_once();
 
-    debug("expand_glob(prefix)", prefix.as_bytes());
-    debug("expand_glob(suffix)", suffix.as_bytes());
-
     let fd = open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, dir)?;
 
     let mut buf = unsafe {
@@ -534,8 +530,6 @@ pub fn expand_glob(
                 let name = unsafe { core::ptr::addr_of!((*ent).d_name).cast::<i8>() };
 
                 let name = unsafe { cstr_from_ptr(name) };
-
-                debug("expand_glob", name.to_bytes());
 
                 let name_bytes = name.to_bytes();
 

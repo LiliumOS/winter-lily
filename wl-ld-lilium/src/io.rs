@@ -5,7 +5,7 @@ use linux_errno::{EINTR, ENODATA};
 use linux_raw_sys::general::{__kernel_off_t, STDERR_FILENO, STDOUT_FILENO};
 use linux_syscall::{Result as _, SYS_lseek, SYS_read, SYS_write, syscall};
 
-use crate::helpers::{copy_to_slice_head, debug};
+use crate::helpers::copy_to_slice_head;
 
 pub type Result<T> = core::result::Result<T, Error>;
 

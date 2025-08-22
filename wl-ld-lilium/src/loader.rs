@@ -21,7 +21,7 @@ use wl_helpers::sync::RwLock;
 
 use crate::{
     entry::TLS_BLOCK_SIZE,
-    helpers::{FusedUnsafeCell, SyncPointer, debug, is_x86_feature_detected},
+    helpers::{FusedUnsafeCell, SyncPointer, is_x86_feature_detected},
     io::STDERR,
     ldso::{self, SearchType},
 };
@@ -64,7 +64,6 @@ impl LoaderImpl for FdLoader {
         map_desc: *mut c_void,
         base_addr: *mut core::ffi::c_void,
     ) -> Result<*mut core::ffi::c_void, Error> {
-        debug("map_phdrs", b"entry");
         let mut last_addr: *mut c_void = core::ptr::without_provenance_mut(0);
         let mut last_perms = 0;
 
@@ -115,11 +114,6 @@ impl LoaderImpl for FdLoader {
 
                 let extra_len = offset - f_offset;
                 let adjusted_len = extra_len + file_len;
-                eprintln!(
-                    "mmap({addr:p} (adjusted {:p}), {file_len:#018x} (adjusted: {adjusted_len:#018x}), {perms:03b}, MAP_PRIVATE | MAP_FIXED, {}, {offset:#018x} (adjusted: {f_offset:#018x})",
-                    addr.map_addr(|v| v & !4095),
-                    map_desc.addr() as i32,
-                );
                 let res = unsafe {
                     syscall!(
                         SYS_mmap,
@@ -215,7 +209,6 @@ impl LoaderImpl for FdLoader {
         let length = (max_pma as usize + 4095) & !4095;
 
         let addr = base.fetch_byte_add(length, core::sync::atomic::Ordering::Relaxed);
-        eprintln!("Load adder {addr:p}");
         // Eventually I'll do better loading opts.
         let res = unsafe {
             syscall!(
@@ -264,12 +257,8 @@ impl LoaderImpl for FdLoader {
 
         let aligned_val = (val + (tls_align as isize - 1)) & !(tls_align as isize - 1);
 
-        eprintln!("TLS offset {val:-} (aligned: {aligned_val:-} ({tls_align:X}))");
-
         let pg = TLS_MC.0.map_addr(|a| a.wrapping_add_signed(val & !4095));
         let map_len = tls_size as isize + (aligned_val - (val & !4095));
-
-        eprintln!("Alloc TLS map({pg:p}, {map_len})");
 
         let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
         res.check().map_err(|_| Error::AllocError)?;
@@ -280,7 +269,6 @@ impl LoaderImpl for FdLoader {
             }
             Ok(aligned_val)
         } else {
-            eprintln!("TLS Size: {aligned_val}");
             unsafe {
                 (*get_master_tcb()).dyn_size = (-aligned_val) as usize;
                 (*get_master_tcb()).version += 1;
@@ -357,13 +345,10 @@ pub fn update_tls() {
     let tlsmc = TLS_MC.0;
     let tcb = unsafe { &mut *(tp.cast::<Tcb>()) };
     let mtcb = unsafe { &*tlsmc.cast::<Tcb>() };
-    eprintln!("MTCB before update_tls: {mtcb:?} (thread {tcb:?})");
     if tcb.load_size < mtcb.load_size {
         let len = mtcb.load_size - tcb.load_size;
         let pg = tp.map_addr(|a| a + (tcb.load_size & !4095));
         let map_len = mtcb.load_size - (tcb.load_size & !4095);
-        eprintln!("new map base ptr: {pg:p}");
-        eprintln!("new map len: {map_len}");
         let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
 
         if let Err(e) = res.check() {
@@ -381,8 +366,6 @@ pub fn update_tls() {
         let len = mtcb.dyn_size - tcb.dyn_size;
         let pg = tp.map_addr(|a| a - ((mtcb.dyn_size + 4095) & !4095));
         let map_len = ((mtcb.dyn_size + 4095) & !4095) - tcb.dyn_size;
-        eprintln!("new map base ptr: {pg:p}");
-        eprintln!("new map length: {map_len}");
         let res = unsafe { syscall!(SYS_mprotect, pg, map_len, PROT_READ | PROT_WRITE) };
 
         if let Err(e) = res.check() {
@@ -397,8 +380,6 @@ pub fn update_tls() {
     }
 
     tcb.version = mtcb.version;
-
-    eprintln!("TCB after update_tls: {tcb:?}");
 }
 
 pub fn set_tp(ptr: *mut c_void) {

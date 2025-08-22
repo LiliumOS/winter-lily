@@ -6,7 +6,7 @@ use core::{
 
 use ld_so_impl::helpers::cstr_from_ptr;
 
-use crate::helpers::{FusedUnsafeCell, NullTerm, SplitAscii, SyncPointer, debug};
+use crate::helpers::{FusedUnsafeCell, NullTerm, SplitAscii, SyncPointer};
 
 #[unsafe(no_mangle)]
 pub static __environ: FusedUnsafeCell<SyncPointer<*mut *mut c_char>> =
@@ -17,7 +17,6 @@ global_asm! {
 }
 
 pub fn get_env(var: &str) -> Option<&str> {
-    debug("get_env", var.as_bytes());
     for ptr in
         unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__environ.0)?).copied() }
     {
@@ -28,7 +27,6 @@ pub fn get_env(var: &str) -> Option<&str> {
         let (key, val) = SplitAscii::new(st, b'=').split_once();
 
         if key == var {
-            debug("get_env(return)", val.as_bytes());
             return Some(val);
         }
     }
@@ -36,7 +34,6 @@ pub fn get_env(var: &str) -> Option<&str> {
 }
 
 pub fn get_cenv(var: &str) -> Option<&CStr> {
-    debug("get_env", var.as_bytes());
     for ptr in
         unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new(__environ.0)?).copied() }
     {
@@ -51,7 +48,6 @@ pub fn get_cenv(var: &str) -> Option<&CStr> {
         let pos = key.len() + 1;
 
         if key == var {
-            debug("get_env(return)", val.as_bytes());
             return Some(unsafe { cstr_from_ptr(bytes[pos..].as_ptr().cast()) });
         }
     }

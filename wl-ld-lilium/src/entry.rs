@@ -8,7 +8,9 @@ use lilium_sys::sys::kstr::KSlice;
 use linux_raw_sys::general::{
     MAP_ANONYMOUS, MAP_PRIVATE, O_RDONLY, PROT_NONE, PROT_READ, PROT_WRITE,
 };
-use linux_syscall::{Result as _, SYS_close, SYS_mmap, SYS_mprotect, SYS_openat, Syscall, syscall};
+use linux_syscall::{
+    Result as _, SYS_close, SYS_mmap, SYS_mprotect, SYS_open, SYS_openat, Syscall, syscall,
+};
 use rustix::fd::AsRawFd;
 use rustix::fs::{Mode, OFlags, open};
 use wl_interface_map::{
@@ -25,9 +27,7 @@ use linux_syscall::{SYS_exit, SYS_prctl, SYS_write};
 use crate::auxv::AuxEnt;
 use crate::elf::{DynEntryType, ElfDyn};
 use crate::env;
-use crate::helpers::{
-    FusedUnsafeCell, NullTerm, SyncPointer, debug, open_sysroot_rdonly, rand::Gen,
-};
+use crate::helpers::{FusedUnsafeCell, NullTerm, SyncPointer, open_sysroot_rdonly, rand::Gen};
 use crate::helpers::{pread_exact, udata};
 use crate::loader::{LOADER, TLS_MC, Tcb, set_tp, setup_tls_mc, update_tls};
 use crate::{env::__environ, resolver};
@@ -111,8 +111,14 @@ unsafe extern "C" fn __rust_entry(
     unsafe { (&mut *RESOLVER.as_ptr()).set_resolve_error_callback(resolve_error) };
     unsafe { (&mut *RESOLVER.as_ptr()).set_loader_backend(&LOADER) };
 
+    let mut execfn = core::ptr::null::<c_char>();
+    let mut at_base = core::ptr::null();
+
     for auxent in auxv {
         match auxent.at_tag as u32 {
+            linux_raw_sys::general::AT_BASE => {
+                at_base = auxent.at_val;
+            }
             linux_raw_sys::general::AT_RANDOM => {
                 rand = unsafe { auxent.at_val.cast::<[u8; 16]>().read() }
             }
@@ -136,17 +142,8 @@ unsafe extern "C" fn __rust_entry(
                 execfd = auxent.at_val.addr() as i32;
             }
             linux_raw_sys::general::AT_EXECFN => {
-                if execfd == !0 {
-                    execfd = open(
-                        unsafe { cstr_from_ptr(auxent.at_val.cast()) },
-                        OFlags::RDONLY,
-                        Mode::empty(),
-                    )
-                    .unwrap()
-                    .as_raw_fd();
-                }
+                execfn = auxent.at_val.cast();
             }
-
             _ => {}
         }
     }
@@ -187,161 +184,176 @@ unsafe extern "C" fn __rust_entry(
         }
     }
 
-    if execfd == !0 {
-        if argc < 1 {
-            crash_unrecoverably()
-        }
-
-        let prg_name = core::str::from_utf8(unsafe { CStr::from_ptr(*argv) }.to_bytes())
-            .expect("UTF-8 Required");
-
-        argv = unsafe { argv.add(1) };
-        argc -= 1;
-        let mut args =
-            unsafe { NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new_unchecked(argv)) };
-
-        let mut exec_name = None::<&CStr>;
-
-        let mut args = args
-            .by_ref()
-            .map(|&ptr| unsafe { CStr::from_ptr(ptr) })
-            .inspect(|v| debug("visit_argv", v.to_bytes()))
-            .inspect(|_| argc -= 1);
-
-        let mut argv0_override = core::ptr::null_mut();
-
-        while let Some(arg) = args.next() {
-            match core::str::from_utf8(arg.to_bytes()) {
-                Ok("--help") => {
-                    println!("Usage: {prg_name} {USAGE_TAIL}");
-                    println!(
-                        "Usage: [binary name] [args...] (requires having the sysroot be the root directory)"
-                    );
-                    println!();
-                    println!(
-                        "Entry point for winter-lily - allows executing most Lilium Programs on Linux"
-                    );
-                    println!("Options:");
-                    println!("\t--help: Print this message and exit");
-                    println!("\t--version: Print version information and exit");
-                    println!(
-                        "\t--argv0 [name]: Report <name> (instead of <binary name>) as argv0 passed to the process"
-                    );
-                    println!(
-                        "\t--preload-lilium <module>: Causes <module> to be loaded as a Lilium library before the program or any library in the context of Lilium code."
-                    );
-                    println!(
-                        "\t\t<module> is either a library name (looked up in the lilium search path) or a path to a library."
-                    );
-                    println!(
-                        "\t--preload-native <module>, --preload-subsys <module>: Causes <module> to be loaded as a native library before any library other than ld.so."
-                    );
-                    println!(
-                        "\t\t<module> is either a library name (looked up in the native search path) or a path to a library."
-                    );
-                    println!(
-                        "\t\t--preload-subsys differs from --preload-native in that, after the library is loaded, a symbol named {} is found and executed.",
-                        wl_init_subsystem_name!()
-                    );
-                    println!();
-                    println!("Environment Variables:");
-                    println!(
-                        "\tLD_LIBRARY_PATH_WL_LILIUM: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for lilium libraries"
-                    );
-                    println!(
-                        "\tLD_LIBRARY_PATH_WL_NATIVE: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for native libraries"
-                    );
-                    println!(
-                        "\tWL_SYSROOT: Treats absolute paths used to lookup libraries and configuration files as if they are prefixed by the path in this string"
-                    );
-                    println!(
-                        "\tWL_NATIVE_LD_SO_CONF: Look in this file, instead of /etc/ld.so.conf, for the paths to search for native libraries"
-                    );
-                    println!(
-                        "\tWL_LILIUM_LD_SO_CONF: Look in this file, instead of /etc/ld-lilium.so.conf, for paths to search for lilium libraries"
-                    );
-                    println!(
-                        "\tWL_SUBSYS_<name>: Specifies an **absolute path** to use when loading the subsystem with name <name>."
-                    );
-                    println!();
-                    println!("Secure Mode:");
-                    println!(
-                        "\tLinux and ld.so support something called Secure Mode, which is used when running programs with higher capabilities or with setuid"
-                    );
-                    println!(
-                        "\tProperly supporting Secure Mode requires adjusting substantial party of the behaviour of {prg_name}."
-                    );
-                    println!(
-                        "\tFor simplicitly and security, Secure Mode support is not implemented for winter-lily programs."
-                    );
-                    println!(
-                        "\tIf a Lilium program is run in Secure Mode (according to the `AT_SECURE` auxv entry), {prg_name} will print an error message and exit immediately"
-                    );
-                    return 0;
+    'a: {
+        if execfd == !0 {
+            if !execfn.is_null() {
+                let cs = core::str::from_utf8(unsafe { CStr::from_ptr(execfn) }.to_bytes())
+                    .expect("UTF-8 Required");
+                if !at_base.is_null() {
+                    execfd = syscall! {
+                        SYS_open,
+                        execfn,
+                        linux_raw_sys::general::O_RDONLY
+                    }
+                    .as_usize_unchecked() as i32;
+                    break 'a;
                 }
-                Ok("--version") => {
-                    println!(
-                        "wl-ld-lilium-{ARCH}.so (VERSION {})",
-                        core::env!("CARGO_PKG_VERSION")
-                    );
-                    println!("winter-lily compatibility layer for linux");
-                    println!(
-                        "(C) 2025 Lilium Project Developers. This Project is released under the terms of the MIT and Apache-2.0 License"
-                    );
-                    return 0;
-                }
-                Ok("--argv0") => {
-                    let ptr = unsafe { argv.add(1).read() };
+            }
+            if argc < 1 {
+                crash_unrecoverably()
+            }
 
-                    argv0_override = ptr;
+            let prg_name = core::str::from_utf8(unsafe { CStr::from_ptr(*argv) }.to_bytes())
+                .expect("UTF-8 Required");
 
-                    argv = unsafe { argv.add(2) };
+            argv = unsafe { argv.add(1) };
+            argc -= 1;
+            let mut args = unsafe {
+                NullTerm::<*mut c_char>::from_ptr_unchecked(NonNull::new_unchecked(argv))
+            };
+
+            let mut exec_name = None::<&CStr>;
+
+            let mut args = args
+                .by_ref()
+                .map(|&ptr| unsafe { CStr::from_ptr(ptr) })
+                .inspect(|_| argc -= 1);
+
+            let mut argv0_override = core::ptr::null_mut();
+
+            while let Some(arg) = args.next() {
+                match core::str::from_utf8(arg.to_bytes()) {
+                    Ok("--help") => {
+                        println!("Usage: {prg_name} {USAGE_TAIL}");
+                        println!(
+                            "Usage: [binary name] [args...] (requires having the sysroot be the root directory)"
+                        );
+                        println!();
+                        println!(
+                            "Entry point for winter-lily - allows executing most Lilium Programs on Linux"
+                        );
+                        println!("Options:");
+                        println!("\t--help: Print this message and exit");
+                        println!("\t--version: Print version information and exit");
+                        println!(
+                            "\t--argv0 [name]: Report <name> (instead of <binary name>) as argv0 passed to the process"
+                        );
+                        println!(
+                            "\t--preload-lilium <module>: Causes <module> to be loaded as a Lilium library before the program or any library in the context of Lilium code."
+                        );
+                        println!(
+                            "\t\t<module> is either a library name (looked up in the lilium search path) or a path to a library."
+                        );
+                        println!(
+                            "\t--preload-native <module>, --preload-subsys <module>: Causes <module> to be loaded as a native library before any library other than ld.so."
+                        );
+                        println!(
+                            "\t\t<module> is either a library name (looked up in the native search path) or a path to a library."
+                        );
+                        println!(
+                            "\t\t--preload-subsys differs from --preload-native in that, after the library is loaded, a symbol named {} is found and executed.",
+                            wl_init_subsystem_name!()
+                        );
+                        println!();
+                        println!("Environment Variables:");
+                        println!(
+                            "\tLD_LIBRARY_PATH_WL_LILIUM: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for lilium libraries"
+                        );
+                        println!(
+                            "\tLD_LIBRARY_PATH_WL_NATIVE: If set to a non-empty string, it contains a list of paths (separated by ':') that are searched when looking for native libraries"
+                        );
+                        println!(
+                            "\tWL_SYSROOT: Treats absolute paths used to lookup libraries and configuration files as if they are prefixed by the path in this string"
+                        );
+                        println!(
+                            "\tWL_NATIVE_LD_SO_CONF: Look in this file, instead of /etc/ld.so.conf, for the paths to search for native libraries"
+                        );
+                        println!(
+                            "\tWL_LILIUM_LD_SO_CONF: Look in this file, instead of /etc/ld-lilium.so.conf, for paths to search for lilium libraries"
+                        );
+                        println!(
+                            "\tWL_SUBSYS_<name>: Specifies an **absolute path** to use when loading the subsystem with name <name>."
+                        );
+                        println!();
+                        println!("Secure Mode:");
+                        println!(
+                            "\tLinux and ld.so support something called Secure Mode, which is used when running programs with higher capabilities or with setuid"
+                        );
+                        println!(
+                            "\tProperly supporting Secure Mode requires adjusting substantial party of the behaviour of {prg_name}."
+                        );
+                        println!(
+                            "\tFor simplicitly and security, Secure Mode support is not implemented for winter-lily programs."
+                        );
+                        println!(
+                            "\tIf a Lilium program is run in Secure Mode (according to the `AT_SECURE` auxv entry), {prg_name} will print an error message and exit immediately"
+                        );
+                        return 0;
+                    }
+                    Ok("--version") => {
+                        println!(
+                            "wl-ld-lilium-{ARCH}.so (VERSION {})",
+                            core::env!("CARGO_PKG_VERSION")
+                        );
+                        println!("winter-lily compatibility layer for linux");
+                        println!(
+                            "(C) 2025 Lilium Project Developers. This Project is released under the terms of the MIT and Apache-2.0 License"
+                        );
+                        return 0;
+                    }
+                    Ok("--argv0") => {
+                        let ptr = unsafe { argv.add(1).read() };
+
+                        argv0_override = ptr;
+
+                        argv = unsafe { argv.add(2) };
+                    }
+                    Ok("--preload-subsystem") => todo!("--preload-subsystem"),
+                    Ok("--preload-native") => todo!("--preload-native"),
+                    Ok("--preload-lilium") => todo!("--preload-lilium"),
+                    Ok(x) if x.starts_with("--") => {
+                        eprintln!(
+                            "Unknown Option {x}. Note that if this is a relative program name, use `./{x}` instead"
+                        );
+                        return 1;
+                    }
+                    Ok(_) | Err(_) => {
+                        argc += 1;
+                        exec_name = Some(arg);
+                        break;
+                    }
                 }
-                Ok("--preload-subsystem") => todo!("--preload-subsystem"),
-                Ok("--preload-native") => todo!("--preload-native"),
-                Ok("--preload-lilium") => todo!("--preload-lilium"),
-                Ok(x) if x.starts_with("--") => {
+            }
+
+            if let Some(exec_name) = exec_name {
+                let fd = unsafe {
+                    syscall!(
+                        SYS_openat,
+                        linux_raw_sys::general::AT_FDCWD,
+                        exec_name.as_ptr(),
+                        O_RDONLY
+                    )
+                };
+
+                if let Err(e) = fd.check() {
                     eprintln!(
-                        "Unknown Option {x}. Note that if this is a relative program name, use `./{x}` instead"
+                        "Failed to open {}: {:?}",
+                        unsafe { core::str::from_utf8_unchecked(exec_name.to_bytes()) },
+                        e
                     );
                     return 1;
                 }
-                Ok(_) | Err(_) => {
-                    argc += 1;
-                    exec_name = Some(arg);
-                    break;
-                }
-            }
-        }
 
-        if let Some(exec_name) = exec_name {
-            let fd = unsafe {
-                syscall!(
-                    SYS_openat,
-                    linux_raw_sys::general::AT_FDCWD,
-                    exec_name.as_ptr(),
-                    O_RDONLY
-                )
-            };
-
-            if let Err(e) = fd.check() {
-                eprintln!(
-                    "Failed to open {}: {:?}",
-                    unsafe { core::str::from_utf8_unchecked(exec_name.to_bytes()) },
-                    e
-                );
+                execfd = fd.as_usize_unchecked() as i32;
+            } else {
+                eprintln!("Usage: {prg_name} {USAGE_TAIL}");
                 return 1;
             }
 
-            execfd = fd.as_usize_unchecked() as i32;
-        } else {
-            eprintln!("Usage: {prg_name} {USAGE_TAIL}");
-            return 1;
-        }
-
-        if !argv0_override.is_null() {
-            unsafe {
-                *argv = argv0_override;
+            if !argv0_override.is_null() {
+                unsafe {
+                    *argv = argv0_override;
+                }
             }
         }
     }
@@ -434,20 +446,13 @@ unsafe extern "C" fn __rust_entry(
 
     let base = ldso::load_subsystem("base");
 
-    // eprintln!("Entries:");
-    // eprintln!("{:#?}", RESOLVER.live_entries());
-
     let sym = RESOLVER.find_sym(wl_setup_process_name!(C), false);
-
-    eprintln!("Found __wl_impl_setup_process: {:p}", sym);
 
     let setup_process: wl_interface_map::SetupProcessTy = unsafe { core::mem::transmute(sym) };
 
     let rand_bytes = bytemuck::must_cast([rand.next(), rand.next()]);
 
     let base_init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), base, false);
-
-    eprintln!("Found libusi-base.so:__init_subsystem {base_init_subsystem:p}");
 
     unsafe {
         setup_process(
@@ -486,8 +491,6 @@ unsafe extern "C" fn __rust_entry(
 
     let entry = unsafe { binary.base.add(header.e_entry as usize) };
 
-    eprintln!("Found _start {entry:p}");
-
     update_tls();
 
     __setup_auxv(auxv, entry, argv, argc, envp, envpc, &mut rand)
@@ -509,8 +512,6 @@ fn __setup_auxv(
 
     let get_init_handles = RESOLVER.find_sym(wl_get_init_handles_name!(C), false);
 
-    eprintln!("Found get_init_handles: {get_init_handles:p}");
-
     let get_init_handles: GetInitHandlesTy = unsafe { core::mem::transmute(get_init_handles) };
     unsafe {
         get_init_handles(&mut init_handles);
@@ -528,8 +529,6 @@ fn __setup_auxv(
         at_tag: AT_LILIUM_INIT_HANDLES_LEN as usize,
         at_val: udata(init_handles.len),
     };
-
-    eprintln!("All loaded modules {:?}", WL_RESOLVER.live_entries());
 
     unsafe { __call_entry_point(argc, argv, envp, envpc, lilium_aux.as_mut_ptr(), 3, entry) }
 }

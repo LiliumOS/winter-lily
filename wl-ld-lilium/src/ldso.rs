@@ -19,7 +19,7 @@ use crate::entry::RESOLVER;
 use crate::env::{self, get_env};
 
 use crate::helpers::{
-    FusedUnsafeCell, MmapAllocator, OnceLock, SyncPointer, copy_to_slice_head, debug, has_prefix,
+    FusedUnsafeCell, MmapAllocator, OnceLock, SyncPointer, copy_to_slice_head, has_prefix,
     safe_zeroed,
 };
 
@@ -42,8 +42,6 @@ fn read_config_file(fd: i32, buf: &mut Vec<u8, MmapAllocator>) -> crate::io::Res
             Some(val) => val,
             None => break,
         };
-
-        eprintln!("{str}");
 
         let st = SplitAscii::new(str, b'#').split_once().0.trim_ascii();
 
@@ -95,7 +93,6 @@ fn init_cache_slow(env_name: &str, config_path: &str) -> crate::io::Result<&'sta
         copy_to_slice_head(&mut buf[pos..], v.as_bytes());
     }
     if let Ok(fd) = open_sysroot_rdonly(linux_raw_sys::general::AT_FDCWD, config_path) {
-        debug("init_cache_slow(read)", config_path.as_bytes());
         read_config_file(fd, &mut buf)?;
     }
 
@@ -142,9 +139,6 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
     let path = path?;
 
     for p in SplitAscii::new(path, b'\x1E') {
-        eprintln!("{}: Searching: {p}", unsafe {
-            core::str::from_utf8_unchecked(name.to_bytes())
-        });
         let vbuf = copy_to_slice_head(&mut buf, p.as_bytes());
         vbuf[0] = b'/';
         let vbuf = copy_to_slice_head(&mut vbuf[1..], name.to_bytes());
@@ -172,8 +166,6 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
                     Err(e) => continue,
                 }
 
-                eprintln!("{header:#x?}");
-
                 if header.e_ident.ei_class != ElfHost::EI_CLASS {
                     continue;
                 }
@@ -189,10 +181,6 @@ pub fn open_module(search: SearchType, name: &CStr) -> crate::io::Result<i32> {
                 rd.seek(crate::io::SeekFrom::Start(0))?;
                 core::mem::forget(rd);
 
-                debug(
-                    "open_module(found)",
-                    unsafe { cstr_from_ptr(buf.as_ptr().cast()) }.to_bytes(),
-                );
                 return Ok(fd);
             }
             Err(e) => match e {
@@ -260,10 +248,7 @@ pub fn load_subsystem(name: &str) -> &'static DynEntry {
 pub fn load_and_init_subsystem(name: &str) -> &'static DynEntry {
     let ent = load_subsystem(name);
 
-    // eprintln!("Loaded libusi-{name}.so: {ent:#x?}");
-
     let init_subsystem = RESOLVER.find_sym_in(wl_init_subsystem_name!(C), ent, false);
-    eprintln!("Found libusi-{name}.so:__init_subsystem {init_subsystem:p}");
 
     let init_subsystem: wl_interface_map::InitSubsystemTy =
         unsafe { core::mem::transmute(init_subsystem) };
