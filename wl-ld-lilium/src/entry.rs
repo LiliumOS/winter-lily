@@ -78,7 +78,7 @@ unsafe extern "C" fn __rust_entry(
             .cast_mut()
             .write(envp)
     }
-    let base_addr = safe_addr_of_mut!(__base_addr);
+    let base_addr = ld_so_impl::load_addr();
 
     let end_addr = safe_addr_of!(__vaddr_end);
     let off = end_addr.align_offset(4096);
@@ -535,7 +535,6 @@ fn __setup_auxv(
 
 unsafe extern "C" {
     safe static _DYNAMIC: ElfDyn;
-    unsafe static mut __base_addr: c_void;
     safe static __vaddr_end: c_void;
 }
 

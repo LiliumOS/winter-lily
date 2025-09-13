@@ -261,7 +261,7 @@ unsafe extern "C" fn malloc(size: usize) -> *mut c_void {
         return core::ptr::null_mut();
     }
     let align = size
-        .isolate_most_significant_one()
+        .isolate_lowest_one()
         .max(core::mem::size_of::<max_align_t>());
     let Ok(layout) = Layout::from_size_align(size + 2 * size_of::<usize>(), align) else {
         return core::ptr::null_mut();
